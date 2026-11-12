@@ -2,6 +2,7 @@
 // client-login edge function (supabase/client_app.sql and supabase/functions/client-login in the CRM repo).
 // A rider has no direct table access.
 import { supabase } from './supabase';
+import type { FlightStatus } from './flight';
 
 export const PHONE = '(619) 394-5340';
 export const PHONE_TEL = '+16193945340';
@@ -10,7 +11,23 @@ export const SITE = 'https://pacificeliterides.com';
 const FUNCTIONS_URL = `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1`;
 const ANON = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
 
-export type Me = { id: number; email: string; name: string | null; phone: string | null };
+export const REVIEW_URL = 'https://search.google.com/local/writereview?placeid=ChIJE0qtZLk4QSARFMPubxQjFBs';
+export const CARD_FEE = 0.035;
+
+export type Place = { label: string; address: string };
+export type Me = {
+  id: number;
+  email: string;
+  name: string | null;
+  phone: string | null;
+  places: Place[];
+  /** the rider's own invite code, and how many friends used it */
+  ref_code: string | null;
+  referrals: number;
+  /** the sentence under "Invite a friend"; null = the block is hidden (set in the CRM database) */
+  referral_offer: string | null;
+  demo: boolean;
+};
 
 export type RideStatus = 'requested' | 'confirmed' | 'on_the_way' | 'on_board' | 'completed' | 'cancelled';
 
@@ -26,15 +43,24 @@ export type Ride = {
   stops: string[];
   vehicle: string | null;
   passengers: string | null;
+  /** who rides, when the booking is for someone else */
+  passenger: string | null;
   flight_number: string | null;
+  flight: FlightStatus | null;
   flight_line: string | null;
-  flight_state: string | null;
   price: number | null;
   /** false while the ride is only requested: the number is an estimate until dispatch confirms */
   price_final: boolean;
   paid: boolean;
+  paid_at: string | null;
+  payment_method: string | null;
+  tip: number | null;
+  deposit_paid: number | null;
   pay_url: string | null;
   pay_kind: 'deposit' | 'invoice' | null;
+  /** no invoice yet, but the rider may open one himself (ride confirmed, price set) */
+  can_pay: boolean;
+  rating: number | null;
   chauffeur: string | null;
   chauffeur_phone: string | null;
   car: string | null;
@@ -60,6 +86,11 @@ export type Booking = {
   flight_number: string;
   note: string;
   estimate: number | null;
+  passenger_name?: string;
+  passenger_phone?: string;
+  extras?: string[];
+  /** a friend's invite code (first booking only) */
+  ref?: string;
 };
 
 async function login(body: Record<string, unknown>, token?: string) {
@@ -93,10 +124,34 @@ export async function deleteAccount() {
 }
 
 export async function me(): Promise<Me | null> {
-  const { data, error } = await supabase.rpc('client_me');
+  const { data, error } = await supabase.rpc('client_profile');
   if (error) throw new Error(error.message);
-  const row = Array.isArray(data) ? data[0] : data;
-  return (row as Me) || null;
+  if (!data) return null;
+  const m = data as Me;
+  return { ...m, places: Array.isArray(m.places) ? m.places : [], referrals: Number(m.referrals) || 0 };
+}
+
+export async function savePlaces(places: Place[]) {
+  const { error } = await supabase.rpc('client_save_places', { p: places });
+  if (error) throw new Error(error.message);
+}
+
+/** The card payment page for this ride: the open Square invoice, or a new one made on the spot. */
+export async function payUrl(rideId: number): Promise<string> {
+  const { data } = await supabase.auth.getSession();
+  const res = await fetch(`${FUNCTIONS_URL}/client-pay`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', apikey: ANON, Authorization: `Bearer ${data.session?.access_token || ANON}` },
+    body: JSON.stringify({ rideId }),
+  });
+  const out = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
+  if (!res.ok || !out.url) throw new Error(out.error || 'Could not open the card payment. Please try again.');
+  return out.url;
+}
+
+export async function rate(rideId: number, stars: number, comment: string) {
+  const { error } = await supabase.rpc('client_rate', { p_lead_id: rideId, p_stars: stars, p_comment: comment || null });
+  if (error) throw new Error(error.message);
 }
 
 export async function saveProfile(name: string, phone: string) {
@@ -105,12 +160,14 @@ export async function saveProfile(name: string, phone: string) {
 }
 
 export async function rides(): Promise<Ride[]> {
-  const { data, error } = await supabase.rpc('client_rides');
+  const { data, error } = await supabase.rpc('client_rides_v2');
   if (error) throw new Error(error.message);
-  return ((data || []) as Ride[]).map((r) => ({
+  return ((Array.isArray(data) ? data : []) as Ride[]).map((r) => ({
     ...r,
     price: r.price == null ? null : Number(r.price),
     hours: r.hours == null ? null : Number(r.hours),
+    tip: r.tip == null ? null : Number(r.tip),
+    deposit_paid: r.deposit_paid == null ? null : Number(r.deposit_paid),
     stops: Array.isArray(r.stops) ? r.stops.filter((s) => typeof s === 'string' && s.trim()) : [],
   }));
 }
@@ -173,3 +230,52 @@ export const STATUS: Record<RideStatus, { label: string; color: string; soft: st
 
 export const isUpcoming = (r: Ride, now = Date.now()) =>
   r.status !== 'cancelled' && r.status !== 'completed' && (!r.ride_datetime || new Date(r.ride_datetime).getTime() > now - 3 * 3_600_000);
+
+export const isAirportText = (t?: string | null) => /airport|\(san\)|\(lax\)|\bcbx\b/i.test(t || '');
+
+/** Ride details as plain text — for the share sheet and the calendar note. */
+export function rideText(r: Ride) {
+  return [
+    `Pacific Elite Rides · ${whenLabel(r.ride_datetime)}`,
+    `Pickup: ${r.pickup || ''}`,
+    ...r.stops.map((s, i) => `Stop ${i + 1}: ${s}`),
+    r.dropoff ? `Drop-off: ${r.dropoff}` : null,
+    r.flight_number ? `Flight: ${r.flight_number}` : null,
+    r.chauffeur ? `Chauffeur: ${r.chauffeur}${[r.car, r.plate].filter(Boolean).length ? ` · ${[r.car, r.plate].filter(Boolean).join(' · ')}` : ''}` : null,
+    `Questions: ${PHONE}`,
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
+/** A paid ride as a receipt: lines and the total (card fee only when it was paid by card). */
+export function receipt(r: Ride) {
+  const fare = r.price ?? 0;
+  const byCard = /square|card/i.test(r.payment_method || '');
+  const fee = byCard ? Math.round(fare * CARD_FEE * 100) / 100 : 0;
+  const tip = r.tip ?? 0;
+  const lines: { label: string; amount: number }[] = [{ label: r.trip_type === 'Hourly' && r.hours ? `Chauffeur service · ${r.hours} h` : 'Ride', amount: fare }];
+  if (fee) lines.push({ label: 'Card processing fee (3.5%)', amount: fee });
+  if (tip) lines.push({ label: 'Gratuity', amount: tip });
+  return { lines, total: Math.round((fare + fee + tip) * 100) / 100, byCard };
+}
+
+export const money2 = (n: number) => `$${Number.isInteger(n) ? n.toLocaleString('en-US') : n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+export function receiptText(r: Ride) {
+  const rc = receipt(r);
+  return [
+    'Pacific Elite Rides LLC · TCP 35857B',
+    `Receipt for ride #${r.id}`,
+    whenLabel(r.ride_datetime),
+    `${shortAddress(r.pickup)}${r.dropoff ? ` → ${shortAddress(r.dropoff)}` : ''}`,
+    '',
+    ...rc.lines.map((l) => `${l.label}: ${money2(l.amount)}`),
+    `Total paid: ${money2(rc.total)}`,
+    r.paid_at ? `Paid ${new Date(r.paid_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}${r.payment_method ? ` · ${r.payment_method}` : ''}` : null,
+    '',
+    `${PHONE} · pacificeliterides.com`,
+  ]
+    .filter((x) => x != null)
+    .join('\n');
+}

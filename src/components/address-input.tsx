@@ -14,9 +14,9 @@ export const AIRPORTS = [
   { label: 'CBX', value: 'Cross Border Xpress (CBX), 2745 Otay Pacific Dr, San Diego, CA' },
 ];
 
-type Props = { label: string; value: string; onChange: (text: string) => void; placeholder: string; dot?: 'black' | 'gold' };
+type Props = { label: string; value: string; onChange: (text: string) => void; placeholder: string; dot?: 'black' | 'gold'; places?: { label: string; address: string }[] };
 
-export default function AddressInput({ label, value, onChange, placeholder, dot = 'black' }: Props) {
+export default function AddressInput({ label, value, onChange, placeholder, dot = 'black', places = [] }: Props) {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [focused, setFocused] = useState(false);
@@ -77,6 +77,11 @@ export default function AddressInput({ label, value, onChange, placeholder, dot 
       </View>
       {!value.trim() && (
         <View style={styles.quick}>
+          {places.map((pl) => (
+            <TouchableOpacity key={`${pl.label}:${pl.address}`} style={[styles.quickChip, styles.placeChip]} onPress={() => pick(pl.address)}>
+              <Text style={[styles.quickText, { color: C.ink }]}>{pl.label}</Text>
+            </TouchableOpacity>
+          ))}
           {AIRPORTS.map((a) => (
             <TouchableOpacity key={a.label} style={styles.quickChip} onPress={() => pick(a.value)}>
               <Text style={styles.quickText}>✈ {a.label}</Text>
@@ -104,7 +109,8 @@ const styles = StyleSheet.create({
   label: { fontSize: 11.5, fontWeight: '700', color: C.muted, textTransform: 'uppercase', letterSpacing: 0.6 },
   input: { fontSize: 17, color: C.ink, paddingVertical: 6, fontWeight: '600' },
   clear: { fontSize: 24, color: '#A1A1A6', paddingHorizontal: 4 },
-  quick: { flexDirection: 'row', gap: 8, marginLeft: 22, marginTop: 4 },
+  quick: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginLeft: 22, marginTop: 4 },
+  placeChip: { backgroundColor: '#F0F0F2', borderColor: '#E0E0E5' },
   quickChip: { backgroundColor: C.goldSoft, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: '#E8D9A8' },
   quickText: { fontSize: 13, fontWeight: '700', color: C.goldText },
   list: { marginLeft: 22, marginTop: 6, backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: C.line, overflow: 'hidden' },

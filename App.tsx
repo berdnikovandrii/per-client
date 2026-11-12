@@ -155,6 +155,7 @@ function Main({ session }: { session: Session }) {
           <BookScreen
             me={me}
             prefill={booking}
+            first={rides.length === 0}
             onClose={() => setBooking(null)}
             onBooked={() => {
               setBooking(null);
@@ -166,7 +167,25 @@ function Main({ session }: { session: Session }) {
         )}
       </Modal>
       <Modal visible={!!open} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setOpen(null)}>
-        {open && <RideScreen ride={open} onClose={() => setOpen(null)} onChanged={refresh} />}
+        {open && (
+          <RideScreen
+            ride={open}
+            onClose={() => setOpen(null)}
+            onChanged={refresh}
+            onBookAgain={(r) => {
+              setOpen(null);
+              setBooking({
+                pickup: r.pickup || '',
+                dropoff: r.dropoff || '',
+                stops: r.stops,
+                tripType: r.trip_type === 'Hourly' ? 'Hourly' : 'One way',
+                passengers: parseInt(r.passengers || '', 10) || undefined,
+                vehicle: /sprinter/i.test(r.vehicle || '') ? 'Sprinter' : 'SUV',
+                hours: r.hours || undefined,
+              });
+            }}
+          />
+        )}
       </Modal>
     </View>
   );

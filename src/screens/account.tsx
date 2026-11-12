@@ -1,8 +1,8 @@
 // Account: name and mobile (what the chauffeur sees), legal links, sign out, delete the account.
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Linking, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Linking, Platform, ScrollView, Share, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Constants from 'expo-constants';
-import { deleteAccount, PHONE, PHONE_TEL, saveProfile, SITE, type Me } from '../lib/api';
+import { deleteAccount, PHONE, PHONE_TEL, savePlaces, saveProfile, SITE, type Me, type Place } from '../lib/api';
 import { supabase } from '../lib/supabase';
 import { C } from '../theme';
 
@@ -12,6 +12,25 @@ export default function AccountScreen({ me, onSaved }: { me: Me; onSaved: () => 
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState('');
   const changed = name.trim() !== (me.name || '') || phone.trim() !== (me.phone || '');
+  const [places, setPlaces] = useState<Place[]>(me.places);
+  const [label, setLabel] = useState('');
+  const [address, setAddress] = useState('');
+
+  async function keepPlaces(next: Place[]) {
+    setPlaces(next);
+    try {
+      await savePlaces(next);
+      onSaved();
+    } catch (e) {
+      setNote(e instanceof Error ? e.message : String(e));
+    }
+  }
+  function addPlace() {
+    if (!label.trim() || !address.trim()) return;
+    keepPlaces([...places, { label: label.trim(), address: address.trim() }].slice(0, 8));
+    setLabel('');
+    setAddress('');
+  }
 
   async function save() {
     setBusy(true);
@@ -66,6 +85,51 @@ export default function AccountScreen({ me, onSaved }: { me: Me; onSaved: () => 
         </TouchableOpacity>
       )}
 
+      <Text style={styles.section}>Saved places</Text>
+      <View style={styles.card}>
+        {places.map((pl, i) => (
+          <View key={`${pl.label}:${i}`} style={styles.place}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.placeLabel}>{pl.label}</Text>
+              <Text style={styles.placeAddress} numberOfLines={2}>{pl.address}</Text>
+            </View>
+            <TouchableOpacity onPress={() => keepPlaces(places.filter((_, j) => j !== i))} hitSlop={10} accessibilityLabel={`Remove ${pl.label}`}>
+              <Text style={styles.placeRemove}>Remove</Text>
+            </TouchableOpacity>
+          </View>
+        ))}
+        {places.length < 8 && (
+          <View style={{ paddingVertical: 8 }}>
+            <TextInput style={styles.input} value={label} onChangeText={setLabel} placeholder="Name: Home, Office, Hotel…" placeholderTextColor="#A1A1A6" maxLength={30} />
+            <View style={styles.divider} />
+            <TextInput style={styles.input} value={address} onChangeText={setAddress} placeholder="Full address" placeholderTextColor="#A1A1A6" autoCorrect={false} />
+            <TouchableOpacity style={[styles.add, (!label.trim() || !address.trim()) && { opacity: 0.4 }]} onPress={addPlace} disabled={!label.trim() || !address.trim()}>
+              <Text style={styles.addText}>Save this place</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+      </View>
+      <Text style={styles.small}>Saved places appear as one-tap buttons when you book.</Text>
+
+      {me.referral_offer && me.ref_code ? (
+        <>
+          <Text style={styles.section}>Invite a friend</Text>
+          <View style={[styles.card, styles.invite]}>
+            <Text style={styles.inviteCode}>{me.ref_code}</Text>
+            <Text style={styles.inviteText}>{me.referral_offer}</Text>
+            {me.referrals > 0 ? <Text style={styles.inviteCount}>{me.referrals} {me.referrals === 1 ? 'friend has' : 'friends have'} used your code</Text> : null}
+            <TouchableOpacity
+              style={styles.add}
+              onPress={() =>
+                Share.share({ message: `I ride with Pacific Elite Rides in San Diego. Use my code ${me.ref_code} when you book your first ride in the app: ${SITE}` }).catch(() => {})
+              }
+            >
+              <Text style={styles.addText}>Share my code</Text>
+            </TouchableOpacity>
+          </View>
+        </>
+      ) : null}
+
       <View style={styles.card}>
         <Link text={`Call dispatch · ${PHONE}`} onPress={() => Linking.openURL(`tel:${PHONE_TEL}`)} />
         <View style={styles.divider} />
@@ -110,5 +174,17 @@ const styles = StyleSheet.create({
   link: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14 },
   linkText: { fontSize: 16, fontWeight: '600', color: C.ink },
   chev: { fontSize: 20, color: '#C7C7CC' },
+  section: { fontSize: 12, fontWeight: '700', color: C.muted, textTransform: 'uppercase', letterSpacing: 0.8, marginTop: 6, marginBottom: 8, marginLeft: 4 },
+  small: { fontSize: 12.5, color: C.muted, marginTop: -6, marginBottom: 14, marginLeft: 4 },
+  place: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.line },
+  placeLabel: { fontSize: 16, fontWeight: '800', color: C.ink },
+  placeAddress: { fontSize: 13.5, color: C.muted, marginTop: 2 },
+  placeRemove: { color: C.red, fontSize: 13, fontWeight: '700' },
+  add: { backgroundColor: C.black, borderRadius: 12, paddingVertical: 12, alignItems: 'center', marginTop: 10, marginBottom: 6 },
+  addText: { color: C.gold, fontSize: 15, fontWeight: '800' },
+  invite: { backgroundColor: C.goldSoft, borderWidth: 1, borderColor: '#E8D9A8', paddingVertical: 14 },
+  inviteCode: { fontSize: 26, fontWeight: '800', color: C.ink, letterSpacing: 2 },
+  inviteText: { fontSize: 14.5, color: '#5E4B14', marginTop: 6, lineHeight: 20 },
+  inviteCount: { fontSize: 13, color: C.goldText, fontWeight: '700', marginTop: 6 },
   version: { textAlign: 'center', color: C.muted, fontSize: 12.5, marginTop: 8 },
 });

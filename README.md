@@ -24,6 +24,14 @@ npx eas-cli@latest build --platform ios --profile production   # App Store build
 npx eas-cli@latest submit --platform ios --latest              # send it to App Store Connect
 ```
 
+## Also in 1.0 (second round, 2026-11-11)
+
+Flight tracker card (same data as the CRM), receipt with share, "Pay by card" that opens the Square invoice inside
+the app (edge function `client-pay` makes the invoice when there is none yet), rating after the ride (5 stars →
+Google review), saved places, booking for someone else, extras, invite code, Add to Calendar, "Where we meet".
+Backend for these: `supabase/client_app_v2.sql` in the CRM repo.
+
 ## Not in 1.0
 
-Live map of the chauffeur (needs GPS in PER Driver) — planned as 1.1. Android — later; needs a Google Play account.
+Live map of the chauffeur (needs GPS in PER Driver) and Spanish — planned as 1.1. Android — later; needs a Google
+Play account.

@@ -27,7 +27,8 @@ export default function RideCard({ ride, onPress }: { ride: Ride; onPress: () =>
         </Text>
         <View style={styles.tags}>
           <Text style={[styles.tag, { color: s.color, backgroundColor: s.soft }]}>{s.label}</Text>
-          {ride.paid ? <Text style={[styles.tag, styles.paid]}>Paid</Text> : ride.pay_url ? <Text style={[styles.tag, styles.due]}>{ride.pay_kind === 'deposit' ? 'Deposit due' : 'Payment due'}</Text> : null}
+          {ride.paid ? <Text style={[styles.tag, styles.paid]}>Paid</Text> : ride.pay_url ? <Text style={[styles.tag, styles.due]}>{ride.pay_kind === 'deposit' ? 'Deposit due' : 'Payment due'}</Text> : ride.can_pay && ride.status === 'completed' ? <Text style={[styles.tag, styles.due]}>Payment due</Text> : null}
+          {ride.status === 'completed' && !ride.rating ? <Text style={[styles.tag, styles.rate]}>Rate your ride</Text> : null}
           {ride.flight_line ? <Text style={styles.tag}>✈ {ride.flight_line}</Text> : ride.flight_number ? <Text style={styles.tag}>✈ {ride.flight_number}</Text> : null}
         </View>
       </View>
@@ -47,4 +48,5 @@ const styles = StyleSheet.create({
   tag: { fontSize: 12, fontWeight: '700', color: '#4A4A50', backgroundColor: '#F0F0F2', paddingHorizontal: 9, paddingVertical: 4, borderRadius: 999, overflow: 'hidden' },
   paid: { color: C.green, backgroundColor: C.greenSoft },
   due: { color: C.red, backgroundColor: C.redSoft },
+  rate: { color: C.goldText, backgroundColor: C.goldSoft },
 });

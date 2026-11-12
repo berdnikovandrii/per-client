@@ -8,7 +8,9 @@ import { book, money, PHONE, type Booking, type Me } from '../lib/api';
 import { estimate, INCLUDED, VEHICLES, type VehicleKey } from '../lib/estimate';
 import { C } from '../theme';
 
-export type Prefill = { pickup?: string; dropoff?: string; tripType?: Booking['trip_type'] };
+export type Prefill = { pickup?: string; dropoff?: string; tripType?: Booking['trip_type']; stops?: string[]; passengers?: number; vehicle?: VehicleKey; hours?: number };
+
+const EXTRAS = ['Child seat', 'Name sign at arrivals', 'Extra luggage', 'Pet on board'];
 
 const TRIPS: Booking['trip_type'][] = ['One way', 'Round trip', 'Hourly'];
 const isAirport = (t: string) => /airport|\(san\)|\(lax\)|\bcbx\b/i.test(t);
@@ -20,16 +22,21 @@ function defaultWhen() {
   return d;
 }
 
-export default function BookScreen({ me, prefill, onClose, onBooked }: { me: Me; prefill?: Prefill; onClose: () => void; onBooked: (id: number) => void }) {
+export default function BookScreen({ me, prefill, first, onClose, onBooked }: { me: Me; prefill?: Prefill; /** no rides yet: offer the invite-code field */ first?: boolean; onClose: () => void; onBooked: (id: number) => void }) {
   const [tripType, setTripType] = useState<Booking['trip_type']>(prefill?.tripType || 'One way');
   const [pickup, setPickup] = useState(prefill?.pickup || '');
   const [dropoff, setDropoff] = useState(prefill?.dropoff || '');
-  const [stops, setStops] = useState<string[]>([]);
+  const [stops, setStops] = useState<string[]>(prefill?.stops || []);
   const [when, setWhen] = useState(defaultWhen);
   const [back, setBack] = useState(() => new Date(defaultWhen().getTime() + 3 * 86_400_000));
-  const [hours, setHours] = useState(3);
-  const [passengers, setPassengers] = useState(2);
-  const [vehicle, setVehicle] = useState<VehicleKey>('SUV');
+  const [hours, setHours] = useState(prefill?.hours || 3);
+  const [passengers, setPassengers] = useState(prefill?.passengers || 2);
+  const [vehicle, setVehicle] = useState<VehicleKey>(prefill?.vehicle || 'SUV');
+  const [extras, setExtras] = useState<string[]>([]);
+  const [forOther, setForOther] = useState(false);
+  const [passengerName, setPassengerName] = useState('');
+  const [passengerPhone, setPassengerPhone] = useState('');
+  const [refCode, setRefCode] = useState('');
   const [flight, setFlight] = useState('');
   const [note, setNote] = useState('');
   const [name, setName] = useState(me.name || '');
@@ -59,6 +66,8 @@ export default function BookScreen({ me, prefill, onClose, onBooked }: { me: Me;
     if (tripType === 'Round trip' && back.getTime() <= when.getTime()) return setError('The return must be after the pickup.');
     if (!name.trim()) return setError('Please add your name.');
     if (phone.replace(/\D/g, '').length < 10) return setError('Please add your mobile number, so the chauffeur can reach you.');
+    if (forOther && !passengerName.trim()) return setError("Please add the passenger's name.");
+    if (forOther && passengerPhone.replace(/\D/g, '').length < 10) return setError("Please add the passenger's mobile number, so the chauffeur can reach them.");
     setBusy(true);
     try {
       const id = await book({
@@ -76,6 +85,10 @@ export default function BookScreen({ me, prefill, onClose, onBooked }: { me: Me;
         flight_number: flight.trim(),
         note: note.trim(),
         estimate: est?.amount ?? null,
+        passenger_name: forOther ? passengerName.trim() : '',
+        passenger_phone: forOther ? passengerPhone.trim() : '',
+        extras,
+        ref: first ? refCode.trim() : '',
       });
       setDone(id);
     } catch (e) {
@@ -126,7 +139,7 @@ export default function BookScreen({ me, prefill, onClose, onBooked }: { me: Me;
         </View>
 
         <View style={styles.card}>
-          <AddressInput label="Pickup" value={pickup} onChange={setPickup} placeholder="Address, hotel or airport" />
+          <AddressInput label="Pickup" value={pickup} onChange={setPickup} placeholder="Address, hotel or airport" places={me.places} />
           {stops.map((s, i) => (
             <View key={i} style={styles.stopRow}>
               <View style={{ flex: 1 }}>
@@ -144,6 +157,7 @@ export default function BookScreen({ me, prefill, onClose, onBooked }: { me: Me;
             onChange={setDropoff}
             placeholder={tripType === 'Hourly' ? 'Where the ride ends' : 'Address, hotel or airport'}
             dot="gold"
+            places={me.places}
           />
           {stops.length < 3 && tripType !== 'Hourly' && (
             <TouchableOpacity onPress={() => setStops((list) => [...list, ''])} style={{ marginLeft: 22, marginTop: 2 }}>
@@ -186,6 +200,18 @@ export default function BookScreen({ me, prefill, onClose, onBooked }: { me: Me;
           })}
         </View>
 
+        <Text style={styles.section}>Extras</Text>
+        <View style={styles.extras}>
+          {EXTRAS.map((x) => {
+            const on = extras.includes(x);
+            return (
+              <TouchableOpacity key={x} style={[styles.extra, on && styles.extraOn]} onPress={() => setExtras((list) => (on ? list.filter((y) => y !== x) : [...list, x]))}>
+                <Text style={[styles.extraText, on && styles.extraTextOn]}>{on ? '✓ ' : ''}{x}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
         <View style={styles.card}>
           {(isAirport(pickup) || isAirport(dropoff)) && (
             <>
@@ -202,6 +228,23 @@ export default function BookScreen({ me, prefill, onClose, onBooked }: { me: Me;
           <View style={styles.divider} />
           <Field label="Mobile" value={phone} onChange={setPhone} placeholder="(619) 555-1234" phone />
         </View>
+
+        <TouchableOpacity style={styles.other} onPress={() => setForOther((v) => !v)} activeOpacity={0.7}>
+          <View style={[styles.check, forOther && styles.checkOn]}>{forOther ? <Text style={styles.checkMark}>✓</Text> : null}</View>
+          <Text style={styles.otherText}>I am booking for someone else</Text>
+        </TouchableOpacity>
+        {forOther && (
+          <View style={styles.card}>
+            <Field label="Passenger name" value={passengerName} onChange={setPassengerName} placeholder="Who is riding" />
+            <View style={styles.divider} />
+            <Field label="Passenger mobile" value={passengerPhone} onChange={setPassengerPhone} placeholder="The chauffeur calls this number" phone />
+          </View>
+        )}
+        {first && (
+          <View style={styles.card}>
+            <Field label="Invite code (optional)" value={refCode} onChange={(t) => setRefCode(t.toUpperCase())} placeholder="A friend's code, if you have one" caps />
+          </View>
+        )}
 
         {est && (
           <View style={[styles.estimate, est.amount == null && styles.estimateCustom]}>
@@ -283,6 +326,16 @@ const styles = StyleSheet.create({
   vehicleName: { fontSize: 16, fontWeight: '800', color: C.ink },
   vehicleNameOn: { color: C.gold },
   vehicleLine: { fontSize: 12.5, color: C.muted, marginTop: 4, lineHeight: 17 },
+  extras: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
+  extra: { backgroundColor: C.card, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9, borderWidth: 1, borderColor: C.line },
+  extraOn: { backgroundColor: C.ink, borderColor: C.ink },
+  extraText: { fontSize: 14, fontWeight: '700', color: C.ink },
+  extraTextOn: { color: C.gold },
+  other: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6, paddingHorizontal: 4, marginBottom: 10 },
+  check: { width: 24, height: 24, borderRadius: 7, borderWidth: 1.5, borderColor: '#C7C7CC', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' },
+  checkOn: { backgroundColor: C.ink, borderColor: C.ink },
+  checkMark: { color: C.gold, fontWeight: '800', fontSize: 14 },
+  otherText: { fontSize: 15.5, fontWeight: '600', color: C.ink },
   stepRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, gap: 12 },
   stepLabel: { fontSize: 16, fontWeight: '600', color: C.ink },
   stepNote: { fontSize: 12, color: C.muted, marginTop: 2 },

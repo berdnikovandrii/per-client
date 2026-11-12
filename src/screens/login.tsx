@@ -1,5 +1,6 @@
 // Sign in with an email and the 6-digit code we send to it (Andrii, 2026-11-11): no password, no SMS.
 // The same address later finds the rider's earlier bookings.
+// The app opens without an account (guest); this screen appears when the rider sends a request or taps Sign in.
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Linking, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { PHONE, PHONE_TEL, SITE, sendCode, verifyCode } from '../lib/api';
@@ -7,7 +8,16 @@ import { C } from '../theme';
 
 const say = (title: string, message: string) => (Platform.OS === 'web' ? console.log(title, message) : Alert.alert(title, message));
 
-export default function Login() {
+type Props = {
+  /** shown above the card, e.g. why we ask now */
+  reason?: string;
+  /** signed in */
+  onDone?: () => void;
+  /** the way back to the app without signing in */
+  onCancel?: () => void;
+};
+
+export default function Login({ reason, onDone, onCancel }: Props) {
   const [email, setEmail] = useState('');
   const [code, setCode] = useState('');
   const [step, setStep] = useState<'email' | 'code'>('email');
@@ -32,7 +42,8 @@ export default function Login() {
           return;
         }
         await verifyCode(address, code);
-        // on success the auth listener in App.tsx takes over
+        // the auth listener in App.tsx picks the session up; the caller continues what the rider was doing
+        onDone?.();
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -57,6 +68,11 @@ export default function Login() {
 
   return (
     <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      {onCancel ? (
+        <TouchableOpacity style={styles.back} onPress={onCancel} hitSlop={12} accessibilityRole="button">
+          <Text style={styles.backText}>‹ Back</Text>
+        </TouchableOpacity>
+      ) : null}
       <View style={styles.brand}>
         <Image source={require('../../assets/splash-icon.png')} style={styles.brandMark} resizeMode="contain" accessibilityLabel="Pacific Elite Rides" />
         <Text style={styles.brandTitle}>PACIFIC ELITE RIDES</Text>
@@ -65,7 +81,8 @@ export default function Login() {
       <View style={styles.card}>
         {step === 'email' ? (
           <>
-            <Text style={styles.title}>Sign in or create your account</Text>
+            <Text style={styles.title}>{reason ? 'Your email' : 'Sign in or create your account'}</Text>
+            {reason ? <Text style={styles.reason}>{reason}</Text> : null}
             <Text style={styles.label}>Email</Text>
             <TextInput
               style={styles.input}
@@ -138,6 +155,9 @@ export default function Login() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: C.black, justifyContent: 'center', padding: 24 },
+  back: { position: 'absolute', top: 18, left: 20, zIndex: 2 },
+  backText: { color: C.gold, fontSize: 17, fontWeight: '700' },
+  reason: { fontSize: 14.5, color: C.text, lineHeight: 21, marginTop: -6, marginBottom: 14 },
   brand: { alignItems: 'center', marginBottom: 26 },
   brandMark: { width: 84, height: 84 },
   brandTitle: { color: C.gold, fontSize: 15, letterSpacing: 4, fontWeight: '700', marginTop: 6 },

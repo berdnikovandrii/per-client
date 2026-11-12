@@ -57,13 +57,19 @@ export default function AddressInput({ label, value, onChange, placeholder, dot 
         <View style={[styles.dot, dot === 'gold' && { backgroundColor: C.gold }]} />
         <View style={{ flex: 1 }}>
           <Text style={styles.label}>{label}</Text>
+          {/* our own placeholder: the native one came out letter-spaced on iPhone after the field was cleared */}
+          {!value ? (
+            <View style={styles.placeholderBox} pointerEvents="none">
+              <Text style={styles.placeholder} numberOfLines={1}>{placeholder}</Text>
+            </View>
+          ) : null}
           <TextInput
             style={styles.input}
             value={value}
             onChangeText={type}
-            placeholder={placeholder}
-            placeholderTextColor="#A1A1A6"
+            accessibilityLabel={`${label}: ${placeholder}`}
             autoCorrect={false}
+            spellCheck={false}
             onFocus={() => setFocused(true)}
             onBlur={() => setTimeout(() => setFocused(false), 200)}
             returnKeyType="done"
@@ -108,6 +114,8 @@ const styles = StyleSheet.create({
   dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: C.ink, marginTop: 14 },
   label: { fontSize: 11.5, fontWeight: '700', color: C.muted, textTransform: 'uppercase', letterSpacing: 0.6 },
   input: { fontSize: 17, color: C.ink, paddingVertical: 6, fontWeight: '600' },
+  placeholderBox: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 34, justifyContent: 'center' },
+  placeholder: { fontSize: 17, color: '#A1A1A6', fontWeight: '500' },
   clear: { fontSize: 24, color: '#A1A1A6', paddingHorizontal: 4 },
   quick: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginLeft: 22, marginTop: 4 },
   placeChip: { backgroundColor: '#F0F0F2', borderColor: '#E0E0E5' },

@@ -1,8 +1,10 @@
 // Home: the next ride (if there is one) and the shortest way to book another.
-import { Linking, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, Linking, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import RideCard from '../components/ride-card';
 import { AIRPORTS } from '../components/address-input';
 import { isUpcoming, PHONE, PHONE_TEL, type Me, type Ride } from '../lib/api';
+import { VEHICLES } from '../lib/estimate';
+import { CAR_PHOTO, FLEET_PHOTO } from '../lib/photos';
 import type { Prefill } from './book';
 import { C } from '../theme';
 
@@ -27,12 +29,18 @@ export default function HomeScreen({ me, rides, refreshing, onRefresh, onBook, o
   return (
     <ScrollView contentContainerStyle={styles.body} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.gold} />}>
       <View style={styles.hero}>
-        <Text style={styles.brand}>PACIFIC ELITE RIDES</Text>
-        <Text style={styles.hello}>{first ? `Hello, ${first}` : 'Welcome'}</Text>
-        <Text style={styles.heroLine}>Black car service in San Diego. Flat rates, no surge.</Text>
-        <TouchableOpacity style={styles.book} onPress={() => onBook()} activeOpacity={0.85}>
-          <Text style={styles.bookText}>Book a ride</Text>
-        </TouchableOpacity>
+        <View style={styles.heroPhoto}>
+          <Image source={FLEET_PHOTO} style={styles.heroPhotoImage} resizeMode="cover" accessibilityLabel="Our fleet by San Diego Bay" />
+          <View style={styles.heroShade} />
+          <Text style={styles.brand}>PACIFIC ELITE RIDES</Text>
+        </View>
+        <View style={styles.heroBody}>
+          <Text style={styles.hello}>{first ? `Hello, ${first}` : 'Welcome'}</Text>
+          <Text style={styles.heroLine}>Black car service in San Diego. Flat rates, no surge.</Text>
+          <TouchableOpacity style={styles.book} onPress={() => onBook()} activeOpacity={0.85}>
+            <Text style={styles.bookText}>Book a ride</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {next && (
@@ -55,6 +63,24 @@ export default function HomeScreen({ me, rides, refreshing, onRefresh, onBook, o
         ))}
       </View>
 
+      <Text style={styles.section}>Our fleet</Text>
+      <View style={styles.grid}>
+        {VEHICLES.map((v) => (
+          <TouchableOpacity
+            key={v.key}
+            style={styles.car}
+            activeOpacity={0.85}
+            onPress={() => onBook(v.key === 'Sprinter' ? { vehicle: 'Sprinter', tripType: 'Hourly' } : { vehicle: 'SUV' })}
+          >
+            <Image source={CAR_PHOTO[v.key]} style={styles.carPhoto} resizeMode="cover" accessibilityIgnoresInvertColors />
+            <View style={styles.carBody}>
+              <Text style={styles.tileTitle}>{v.name}</Text>
+              <Text style={styles.tileLine}>{v.line}</Text>
+            </View>
+          </TouchableOpacity>
+        ))}
+      </View>
+
       <View style={styles.promise}>
         <Text style={styles.promiseItem}>• The price you see is the price you pay: fuel and tolls included</Text>
         <Text style={styles.promiseItem}>• Airport pickups: 60 minutes of free waiting, 90 for international</Text>
@@ -70,11 +96,18 @@ export default function HomeScreen({ me, rides, refreshing, onRefresh, onBook, o
 
 const styles = StyleSheet.create({
   body: { padding: 16, paddingBottom: 32 },
-  hero: { backgroundColor: C.black, borderRadius: 20, padding: 20, marginBottom: 6 },
-  brand: { color: C.gold, fontSize: 11.5, letterSpacing: 3, fontWeight: '800' },
-  hello: { color: '#fff', fontSize: 28, fontWeight: '800', marginTop: 10 },
+  hero: { backgroundColor: C.black, borderRadius: 22, marginBottom: 6, overflow: 'hidden' },
+  heroPhoto: { height: 168, padding: 18, overflow: 'hidden' },
+  heroPhotoImage: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
+  heroShade: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(8,8,8,0.18)' },
+  heroBody: { padding: 18, paddingTop: 14 },
+  brand: { color: '#F1DFAE', fontSize: 11.5, letterSpacing: 3, fontWeight: '800', textShadowColor: 'rgba(0,0,0,0.7)', textShadowRadius: 6, textShadowOffset: { width: 0, height: 1 } },
+  hello: { color: '#fff', fontSize: 28, fontWeight: '800' },
+  car: { width: '48%', flexGrow: 1, backgroundColor: C.card, borderRadius: 16, overflow: 'hidden' },
+  carPhoto: { width: '100%', height: 96, backgroundColor: '#1B1B1D' },
+  carBody: { padding: 12 },
   heroLine: { color: '#B9B9BE', fontSize: 14.5, marginTop: 6, lineHeight: 20 },
-  book: { backgroundColor: C.gold, borderRadius: 14, paddingVertical: 16, alignItems: 'center', marginTop: 18 },
+  book: { backgroundColor: C.gold, borderRadius: 14, paddingVertical: 16, alignItems: 'center', marginTop: 16 },
   bookText: { color: C.black, fontSize: 17, fontWeight: '800' },
   section: { fontSize: 12, fontWeight: '700', color: C.muted, textTransform: 'uppercase', letterSpacing: 0.8, marginTop: 18, marginBottom: 8, marginLeft: 4 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },

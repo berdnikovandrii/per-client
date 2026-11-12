@@ -1,11 +1,15 @@
 // Book a ride: where, when, how many, which car — with the price right away when the rate card knows it.
 // The request goes to dispatch as a lead; the rider gets a push when it is confirmed.
+// A guest can fill in everything and see the price; the email code is asked only at "Request this ride".
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import AddressInput from '../components/address-input';
 import WhenInput from '../components/when-input';
 import { book, money, PHONE, type Booking, type Me } from '../lib/api';
 import { estimate, INCLUDED, VEHICLES, type VehicleKey } from '../lib/estimate';
+import { CAR_PHOTO } from '../lib/photos';
+import { supabase } from '../lib/supabase';
+import Login from './login';
 import { C } from '../theme';
 
 export type Prefill = { pickup?: string; dropoff?: string; tripType?: Booking['trip_type']; stops?: string[]; passengers?: number; vehicle?: VehicleKey; hours?: number };
@@ -44,6 +48,7 @@ export default function BookScreen({ me, prefill, first, onClose, onBooked }: { 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [done, setDone] = useState<number | null>(null);
+  const [askSignIn, setAskSignIn] = useState(false);
 
   const minHours = vehicle === 'Sprinter' ? 4 : 2;
   const shownHours = Math.max(minHours, hours);
@@ -68,6 +73,9 @@ export default function BookScreen({ me, prefill, first, onClose, onBooked }: { 
     if (phone.replace(/\D/g, '').length < 10) return setError('Please add your mobile number, so the chauffeur can reach you.');
     if (forOther && !passengerName.trim()) return setError("Please add the passenger's name.");
     if (forOther && passengerPhone.replace(/\D/g, '').length < 10) return setError("Please add the passenger's mobile number, so the chauffeur can reach them.");
+    // a guest signs in here, once everything else is filled in; send() runs again right after the code
+    const { data: auth } = await supabase.auth.getSession();
+    if (!auth.session) return setAskSignIn(true);
     setBusy(true);
     try {
       const id = await book({
@@ -98,16 +106,31 @@ export default function BookScreen({ me, prefill, first, onClose, onBooked }: { 
     }
   }
 
+  if (askSignIn) {
+    return (
+      <Login
+        reason="One last step: we email you a 6-digit code, then your request is sent. This is also how you follow the ride and get your receipt."
+        onCancel={() => setAskSignIn(false)}
+        onDone={() => {
+          setAskSignIn(false);
+          send();
+        }}
+      />
+    );
+  }
+
   if (done != null) {
     return (
       <View style={styles.doneScreen}>
-        <Text style={styles.doneMark}>✓</Text>
+        <View style={styles.doneBadge}>
+          <Text style={styles.doneMark}>✓</Text>
+        </View>
         <Text style={styles.doneTitle}>Request sent</Text>
         <Text style={styles.doneText}>
           We are checking the schedule now and will confirm shortly{est?.amount ? ` at ${money(est.amount)}` : ' with your price'}. You will get a
           notification, and the ride appears under My rides.
         </Text>
-        <TouchableOpacity style={styles.primary} onPress={() => onBooked(done)}>
+        <TouchableOpacity style={[styles.primary, styles.doneButton]} onPress={() => onBooked(done)}>
           <Text style={styles.primaryText}>See my rides</Text>
         </TouchableOpacity>
       </View>
@@ -192,9 +215,12 @@ export default function BookScreen({ me, prefill, first, onClose, onBooked }: { 
           {VEHICLES.map((v) => {
             const on = vehicle === v.key;
             return (
-              <TouchableOpacity key={v.key} style={[styles.vehicle, on && styles.vehicleOn]} onPress={() => pickVehicle(v.key)} activeOpacity={0.8}>
-                <Text style={[styles.vehicleName, on && styles.vehicleNameOn]}>{v.name}</Text>
-                <Text style={[styles.vehicleLine, on && { color: '#D8D8DC' }]}>{v.line}</Text>
+              <TouchableOpacity key={v.key} style={[styles.vehicle, on && styles.vehicleOn]} onPress={() => pickVehicle(v.key)} activeOpacity={0.85} accessibilityState={{ selected: on }}>
+                <Image source={CAR_PHOTO[v.key]} style={styles.vehiclePhoto} resizeMode="cover" accessibilityIgnoresInvertColors />
+                <View style={styles.vehicleBody}>
+                  <Text style={[styles.vehicleName, on && styles.vehicleNameOn]}>{v.name}</Text>
+                  <Text style={[styles.vehicleLine, on && { color: '#D8D8DC' }]}>{v.line}</Text>
+                </View>
               </TouchableOpacity>
             );
           })}
@@ -321,7 +347,9 @@ const styles = StyleSheet.create({
   addStop: { color: C.goldText, fontSize: 14, fontWeight: '700', paddingVertical: 10 },
   section: { fontSize: 12, fontWeight: '700', color: C.muted, textTransform: 'uppercase', letterSpacing: 0.8, marginTop: 6, marginBottom: 8, marginLeft: 4 },
   vehicles: { flexDirection: 'row', gap: 10, marginBottom: 12 },
-  vehicle: { flex: 1, backgroundColor: C.card, borderRadius: 16, padding: 14, borderWidth: 1.5, borderColor: 'transparent' },
+  vehicle: { flex: 1, backgroundColor: C.card, borderRadius: 16, borderWidth: 1.5, borderColor: 'transparent', overflow: 'hidden' },
+  vehiclePhoto: { width: '100%', height: 92, backgroundColor: '#1B1B1D' },
+  vehicleBody: { padding: 12 },
   vehicleOn: { backgroundColor: C.ink, borderColor: C.gold },
   vehicleName: { fontSize: 16, fontWeight: '800', color: C.ink },
   vehicleNameOn: { color: C.gold },
@@ -356,7 +384,9 @@ const styles = StyleSheet.create({
   primaryText: { color: C.gold, fontSize: 17, fontWeight: '800' },
   small: { fontSize: 12.5, color: C.muted, textAlign: 'center', marginTop: 10, lineHeight: 18 },
   doneScreen: { flex: 1, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center', padding: 28 },
-  doneMark: { fontSize: 44, color: C.green, fontWeight: '800' },
-  doneTitle: { fontSize: 26, fontWeight: '800', color: C.ink, marginTop: 8 },
-  doneText: { fontSize: 15.5, color: C.text, textAlign: 'center', lineHeight: 23, marginTop: 10, marginBottom: 10 },
+  doneBadge: { width: 76, height: 76, borderRadius: 38, backgroundColor: C.greenSoft, alignItems: 'center', justifyContent: 'center' },
+  doneMark: { fontSize: 38, color: C.green, fontWeight: '800' },
+  doneTitle: { fontSize: 26, fontWeight: '800', color: C.ink, marginTop: 16 },
+  doneText: { fontSize: 15.5, color: C.text, textAlign: 'center', lineHeight: 23, marginTop: 10, marginBottom: 14 },
+  doneButton: { alignSelf: 'stretch' },
 });

@@ -152,6 +152,36 @@ export default function AccountScreen({ me, onSaved }: { me: Me; onSaved: () => 
   );
 }
 
+/** The Account tab before signing in: what an account is for, the way in, and everything that needs no account. */
+export function GuestAccount({ onSignIn }: { onSignIn: () => void }) {
+  return (
+    <ScrollView contentContainerStyle={styles.body}>
+      <Text style={styles.title}>Account</Text>
+      <Text style={styles.email}>You are browsing as a guest</Text>
+      <View style={[styles.card, { paddingVertical: 16 }]}>
+        <Text style={styles.guestTitle}>Sign in with your email</Text>
+        <Text style={styles.guestText}>No password: we email you a 6-digit code. With an account you can follow your rides, save your addresses, pay by card and keep your receipts.</Text>
+        <TouchableOpacity style={[styles.save, { marginTop: 14, marginBottom: 0 }]} onPress={onSignIn}>
+          <Text style={styles.saveText}>Sign in</Text>
+        </TouchableOpacity>
+      </View>
+      <View style={styles.card}>
+        <Link text={`Call dispatch · ${PHONE}`} onPress={() => Linking.openURL(`tel:${PHONE_TEL}`)} />
+        <View style={styles.divider} />
+        <Link text="Text us" onPress={() => Linking.openURL(`sms:${PHONE_TEL}`)} />
+        <View style={styles.divider} />
+        <Link text="Rates and services" onPress={() => Linking.openURL(`${SITE}/services.html`)} />
+      </View>
+      <View style={styles.card}>
+        <Link text="Privacy Policy" onPress={() => Linking.openURL(`${SITE}/privacy.html`)} />
+        <View style={styles.divider} />
+        <Link text="Terms of Service" onPress={() => Linking.openURL(`${SITE}/terms.html`)} />
+      </View>
+      <Text style={styles.version}>Pacific Elite Rides {Constants.expoConfig?.version || ''} · TCP 35857B</Text>
+    </ScrollView>
+  );
+}
+
 function Link({ text, onPress, danger }: { text: string; onPress: () => void; danger?: boolean }) {
   return (
     <TouchableOpacity style={styles.link} onPress={onPress}>
@@ -186,5 +216,7 @@ const styles = StyleSheet.create({
   inviteCode: { fontSize: 26, fontWeight: '800', color: C.ink, letterSpacing: 2 },
   inviteText: { fontSize: 14.5, color: '#5E4B14', marginTop: 6, lineHeight: 20 },
   inviteCount: { fontSize: 13, color: C.goldText, fontWeight: '700', marginTop: 6 },
+  guestTitle: { fontSize: 18, fontWeight: '800', color: C.ink },
+  guestText: { fontSize: 14.5, color: C.text, lineHeight: 21, marginTop: 6 },
   version: { textAlign: 'center', color: C.muted, fontSize: 12.5, marginTop: 8 },
 });

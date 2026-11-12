@@ -4,9 +4,9 @@ import RideCard from '../components/ride-card';
 import { isUpcoming, type Ride } from '../lib/api';
 import { C } from '../theme';
 
-type Props = { rides: Ride[]; refreshing: boolean; onRefresh: () => void; onOpen: (r: Ride) => void; onBook: () => void };
+type Props = { rides: Ride[]; refreshing: boolean; onRefresh: () => void; onOpen: (r: Ride) => void; onBook: () => void; /** not signed in: offer to */ onSignIn?: () => void };
 
-export default function RidesScreen({ rides, refreshing, onRefresh, onOpen, onBook }: Props) {
+export default function RidesScreen({ rides, refreshing, onRefresh, onOpen, onBook, onSignIn }: Props) {
   const t = (r: Ride) => new Date(r.ride_datetime || r.created_at).getTime();
   const upcoming = rides.filter((r) => isUpcoming(r)).sort((a, b) => t(a) - t(b));
   const past = rides.filter((r) => !isUpcoming(r)).sort((a, b) => t(b) - t(a));
@@ -31,13 +31,26 @@ export default function RidesScreen({ rides, refreshing, onRefresh, onOpen, onBo
         </View>
       }
       ListEmptyComponent={
-        <View style={styles.empty}>
-          <Text style={styles.emptyTitle}>No rides yet</Text>
-          <Text style={styles.emptyText}>Book your first ride and it will show up here with its status, your chauffeur and the car.</Text>
-          <TouchableOpacity style={styles.button} onPress={onBook}>
-            <Text style={styles.buttonText}>Book a ride</Text>
-          </TouchableOpacity>
-        </View>
+        onSignIn ? (
+          <View style={styles.empty}>
+            <Text style={styles.emptyTitle}>Your rides live here</Text>
+            <Text style={styles.emptyText}>Sign in with your email to see your bookings, your chauffeur and the car, receipts and flight status. Rides you booked with us before show up too.</Text>
+            <TouchableOpacity style={styles.button} onPress={onSignIn}>
+              <Text style={styles.buttonText}>Sign in</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.second} onPress={onBook}>
+              <Text style={styles.secondText}>Book a ride first</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <View style={styles.empty}>
+            <Text style={styles.emptyTitle}>No rides yet</Text>
+            <Text style={styles.emptyText}>Book your first ride and it will show up here with its status, your chauffeur and the car.</Text>
+            <TouchableOpacity style={styles.button} onPress={onBook}>
+              <Text style={styles.buttonText}>Book a ride</Text>
+            </TouchableOpacity>
+          </View>
+        )
       }
     />
   );
@@ -53,4 +66,6 @@ const styles = StyleSheet.create({
   emptyText: { fontSize: 15, color: C.muted, textAlign: 'center', lineHeight: 22, marginTop: 8 },
   button: { backgroundColor: C.black, borderRadius: 12, paddingHorizontal: 22, paddingVertical: 14, marginTop: 18 },
   buttonText: { color: C.gold, fontWeight: '800', fontSize: 16 },
+  second: { paddingVertical: 14 },
+  secondText: { color: C.goldText, fontWeight: '700', fontSize: 15 },
 });

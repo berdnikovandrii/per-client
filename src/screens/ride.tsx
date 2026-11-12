@@ -1,11 +1,13 @@
 // One ride: where it stands, the flight, who is driving, the price, paying by card, the receipt,
-// and — after the ride — a rating and "Book again".
-import { useState } from 'react';
+// and — after the ride — a rating and "Book again". While the chauffeur is on the way or the rider is on board,
+// the car is on a map and the screen asks for a fresh position every 12 seconds.
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Platform, ScrollView, Share, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import FlightCard from '../components/flight-card';
+import LiveMap from '../components/live-map';
 import {
-  cancelRequest, isAirportText, money, money2, PHONE, PHONE_TEL, payUrl, rate, receipt, receiptText, REVIEW_URL, rideText,
+  agoLabel, cancelRequest, isAirportText, money, money2, PHONE, PHONE_TEL, payUrl, rate, receipt, receiptText, REVIEW_URL, rideText,
   STATUS, timeLabel, whenLabel, type Ride, type RideStatus,
 } from '../lib/api';
 import { addRideToCalendar, calendarAvailable } from '../lib/calendar';
@@ -34,6 +36,20 @@ export default function RideScreen({ ride, onClose, onChanged, onBookAgain }: Pr
   const live = ride.status !== 'cancelled' && ride.status !== 'completed';
   const airportPickup = isAirportText(ride.pickup);
   const rc = receipt(ride);
+  const moving = ride.status === 'on_the_way' || ride.status === 'on_board';
+  const car = moving ? ride.location : null;
+
+  // while the ride is under way: a fresh position every 12 s, and "updated … ago" kept true in between
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!moving) return;
+    const poll = setInterval(onChanged, 12_000);
+    const tick = setInterval(() => setNow(Date.now()), 5_000);
+    return () => {
+      clearInterval(poll);
+      clearInterval(tick);
+    };
+  }, [moving, onChanged]);
 
   async function doCancel() {
     setBusy('cancel');
@@ -117,6 +133,22 @@ export default function RideScreen({ ride, onClose, onChanged, onBookAgain }: Pr
             <Text style={[styles.note, { color: C.red, marginTop: 0 }]}>{s.note} Need it after all? Call us at {PHONE}.</Text>
           </View>
         )}
+
+        {car ? (
+          <View style={styles.card}>
+            <View style={styles.mapHead}>
+              <Text style={styles.cardLabel}>{ride.status === 'on_board' ? 'Your ride now' : 'Your chauffeur now'}</Text>
+              <Text style={styles.mapAgo}>{agoLabel(car.at, now)}</Text>
+            </View>
+            <LiveMap lat={car.lat} lng={car.lng} label={ride.chauffeur || undefined} />
+            <TouchableOpacity
+              style={styles.wide}
+              onPress={() => Linking.openURL(`https://maps.apple.com/?ll=${car.lat},${car.lng}&q=${encodeURIComponent(ride.chauffeur ? `${ride.chauffeur}, your chauffeur` : 'Your chauffeur')}`).catch(() => {})}
+            >
+              <Text style={styles.actionText}>Open in Maps</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
 
         {/* rating first on a finished ride: that is what we want the rider to do next */}
         {ride.status === 'completed' && (
@@ -362,6 +394,8 @@ const styles = StyleSheet.create({
   actions: { flexDirection: 'row', gap: 10, marginTop: 12 },
   action: { flex: 1, backgroundColor: '#fff', borderRadius: 12, paddingVertical: 13, paddingHorizontal: 12, alignItems: 'center', borderWidth: 1, borderColor: C.line },
   actionText: { fontSize: 15, fontWeight: '800', color: C.ink },
+  mapHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  mapAgo: { fontSize: 12, color: C.muted },
   wide: { backgroundColor: '#fff', borderRadius: 12, paddingVertical: 13, alignItems: 'center', borderWidth: 1, borderColor: C.line, marginTop: 12 },
   cancel: { alignItems: 'center', paddingVertical: 18 },
   cancelText: { color: C.red, fontSize: 15, fontWeight: '700' },

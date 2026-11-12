@@ -67,6 +67,8 @@ export type Ride = {
   plate: string | null;
   stage: string | null;
   stage_at: string | null;
+  /** where the car is — only while the chauffeur is on the way or the rider is on board */
+  location: { lat: number; lng: number; heading: number | null; at: string } | null;
   booked_in_app: boolean;
   created_at: string;
 };
@@ -189,6 +191,16 @@ export async function registerPush(token: string) {
 }
 
 // ─── formatting ─────────────────────────────────────────────────────────────────────────
+/** "updated just now" / "updated 40 s ago" / "updated 6 min ago" for the car's position */
+export function agoLabel(iso: string | null | undefined, now = Date.now()) {
+  if (!iso) return '';
+  const sec = Math.max(0, Math.round((now - new Date(iso).getTime()) / 1000));
+  if (Number.isNaN(sec)) return '';
+  if (sec < 20) return 'updated just now';
+  if (sec < 90) return `updated ${Math.round(sec / 10) * 10} s ago`;
+  return `updated ${Math.round(sec / 60)} min ago`;
+}
+
 export const money = (n: number | null | undefined) => (n == null ? '' : `$${Math.round(n).toLocaleString('en-US')}`);
 
 /** "(SAN) San Diego International Airport, 3225 N Harbor Dr…" → "SAN Airport"; otherwise the first two parts. */

@@ -15,7 +15,8 @@
           "tel",
           "sms",
           "mailto"
-        ]
+        ],
+        "CFBundleDisplayName": "Pacific Elite"
       }
     },
     "android": {

@@ -1,0 +1,48 @@
+{
+  "expo": {
+    "name": "Pacific Elite Rides",
+    "slug": "per-client",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "bundleIdentifier": "com.pacificeliterides.app",
+      "supportsTablet": false,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "LSApplicationQueriesSchemes": ["tel", "sms", "mailto"]
+      }
+    },
+    "android": {
+      "package": "com.pacificeliterides.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#080808",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#080808",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 140
+        }
+      ],
+      "expo-notifications",
+      "@react-native-community/datetimepicker"
+    ],
+    "scheme": "pacificeliterides",
+    "owner": "berdnikovandriis-team",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    }
+  }
+}

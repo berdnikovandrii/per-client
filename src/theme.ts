@@ -1,0 +1,18 @@
+export const C = {
+  black: '#080808',
+  ink: '#111111',
+  text: '#333333',
+  muted: '#777777',
+  line: '#E6E6EA',
+  bg: '#F5F5F7',
+  card: '#FFFFFF',
+  gold: '#C8A85F',
+  goldText: '#8A6D1F',
+  goldSoft: '#FBF6E9',
+  green: '#219653',
+  greenSoft: '#E6F4EA',
+  red: '#B3261E',
+  redSoft: '#FDECEA',
+  blue: '#1A56C4',
+  blueSoft: '#E8F0FE',
+};

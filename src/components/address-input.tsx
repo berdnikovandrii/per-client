@@ -18,9 +18,14 @@ export const AIRPORTS = [
   { label: 'CBX', value: 'Cross Border Xpress (CBX), 2745 Otay Pacific Dr, San Diego, CA' },
 ];
 
-type Props = { label: string; value: string; onChange: (text: string) => void; placeholder: string; dot?: 'black' | 'gold'; places?: { label: string; address: string }[] };
+type Props = {
+  label: string; value: string; onChange: (text: string) => void; placeholder: string; dot?: 'black' | 'gold';
+  places?: { label: string; address: string }[];
+  /** just the field with suggestions: no route dot and no airport / saved-place buttons (the Account tab) */
+  bare?: boolean;
+};
 
-export default function AddressInput({ label, value, onChange, placeholder, dot = 'black', places = [] }: Props) {
+export default function AddressInput({ label, value, onChange, placeholder, dot = 'black', places = [], bare }: Props) {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [focused, setFocused] = useState(false);
@@ -62,9 +67,9 @@ export default function AddressInput({ label, value, onChange, placeholder, dot 
   };
 
   return (
-    <View style={styles.wrap}>
+    <View style={[styles.wrap, bare && { paddingVertical: 0 }]}>
       <View style={styles.row}>
-        <View style={[styles.dot, dot === 'gold' && { backgroundColor: C.gold }]} />
+        {bare ? null : <View style={[styles.dot, dot === 'gold' && { backgroundColor: C.gold }]} />}
         <View style={{ flex: 1 }}>
           <Text style={styles.label}>{label}</Text>
           {/* our own placeholder: the native one came out letter-spaced on iPhone after the field was cleared */}
@@ -91,7 +96,7 @@ export default function AddressInput({ label, value, onChange, placeholder, dot 
           </TouchableOpacity>
         ) : null}
       </View>
-      {!value.trim() && (
+      {!value.trim() && !bare && (
         <View style={styles.quick}>
           {places.map((pl) => (
             <TouchableOpacity key={`${pl.label}:${pl.address}`} style={[styles.quickChip, styles.placeChip]} onPress={() => pick(pl.address)}>
@@ -106,10 +111,10 @@ export default function AddressInput({ label, value, onChange, placeholder, dot 
         </View>
       )}
       {focused && down && suggestions.length === 0 && value.trim().length >= 3 ? (
-        <Text style={styles.down}>Suggestions are not available right now. Please type the full address.</Text>
+        <Text style={[styles.down, bare && { marginLeft: 0 }]}>Suggestions are not available right now. Please type the full address.</Text>
       ) : null}
       {focused && suggestions.length > 0 && (
-        <View style={styles.list}>
+        <View style={[styles.list, bare && { marginLeft: 0 }]}>
           {suggestions.map((s) => (
             <TouchableOpacity key={s} style={styles.item} onPress={() => pick(s)}>
               <Text style={styles.itemText} numberOfLines={2}>{s}</Text>

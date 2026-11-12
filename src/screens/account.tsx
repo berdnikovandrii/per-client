@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Platform, ScrollView, Share, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Constants from 'expo-constants';
 import * as Updates from 'expo-updates';
-import { placesDebug } from '../components/address-input';
+import AddressInput, { placesDebug } from '../components/address-input';
 import { deleteAccount, PHONE, PHONE_TEL, savePlaces, saveProfile, SITE, type Me, type Place } from '../lib/api';
 import { supabase } from '../lib/supabase';
 import { C } from '../theme';
@@ -102,9 +102,10 @@ export default function AccountScreen({ me, onSaved }: { me: Me; onSaved: () => 
         ))}
         {places.length < 8 && (
           <View style={{ paddingVertical: 8 }}>
-            <TextInput style={styles.input} value={label} onChangeText={setLabel} placeholder="Name: Home, Office, Hotel…" placeholderTextColor="#A1A1A6" maxLength={30} />
-            <View style={styles.divider} />
-            <TextInput style={styles.input} value={address} onChangeText={setAddress} placeholder="Full address" placeholderTextColor="#A1A1A6" autoCorrect={false} />
+            <Text style={styles.label}>Name of the place</Text>
+            <TextInput style={styles.input} value={label} onChangeText={setLabel} placeholder="Home, Office, Hotel…" placeholderTextColor="#A1A1A6" maxLength={30} />
+            <View style={[styles.divider, { marginBottom: 8 }]} />
+            <AddressInput bare label="Address" value={address} onChange={setAddress} placeholder="Start typing the address" />
             <TouchableOpacity style={[styles.add, (!label.trim() || !address.trim()) && { opacity: 0.4 }]} onPress={addPlace} disabled={!label.trim() || !address.trim()}>
               <Text style={styles.addText}>Save this place</Text>
             </TouchableOpacity>

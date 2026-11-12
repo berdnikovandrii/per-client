@@ -8,6 +8,10 @@ import { C } from '../theme';
 const KEY = Platform.OS === 'web' ? '' : process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY || '';
 const BUNDLE_ID = 'com.pacificeliterides.app';
 
+/** What Google last answered, for the hidden diagnostics on the Account tab (long-press the version line).
+ *  Never holds the key itself, only whether there is one and how long it is. */
+export const placesDebug = { hasKey: !!KEY, keyLength: KEY.length, calls: 0, last: KEY ? 'no lookup yet' : 'no key in this build' };
+
 export const AIRPORTS = [
   { label: 'SAN Airport', value: 'San Diego International Airport (SAN)' },
   { label: 'LAX', value: 'Los Angeles International Airport (LAX)' },
@@ -20,6 +24,7 @@ export default function AddressInput({ label, value, onChange, placeholder, dot 
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [focused, setFocused] = useState(false);
+  const [down, setDown] = useState(false); // Google answered with an error: say so instead of staying silent
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   function type(text: string) {
@@ -37,9 +42,14 @@ export default function AddressInput({ label, value, onChange, placeholder, dot 
     try {
       const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(text)}&key=${KEY}&components=country:us&location=32.7157,-117.1611&radius=120000`;
       const res = await fetch(url, { headers: { 'X-Ios-Bundle-Identifier': BUNDLE_ID } });
-      const data = (await res.json()) as { predictions?: { description: string }[] };
+      const data = (await res.json()) as { status?: string; error_message?: string; predictions?: { description: string }[] };
+      placesDebug.calls += 1;
+      placesDebug.last = `${data.status || `HTTP ${res.status}`}${data.error_message ? `: ${data.error_message}` : ''}`;
+      setDown(!!data.status && data.status !== 'OK' && data.status !== 'ZERO_RESULTS');
       setSuggestions((data.predictions || []).slice(0, 5).map((p) => p.description.replace(/, USA$/, '')));
-    } catch {
+    } catch (e) {
+      placesDebug.calls += 1;
+      placesDebug.last = `network: ${e instanceof Error ? e.message : String(e)}`;
       setSuggestions([]);
     } finally {
       setLoading(false);
@@ -95,6 +105,9 @@ export default function AddressInput({ label, value, onChange, placeholder, dot 
           ))}
         </View>
       )}
+      {focused && down && suggestions.length === 0 && value.trim().length >= 3 ? (
+        <Text style={styles.down}>Suggestions are not available right now. Please type the full address.</Text>
+      ) : null}
       {focused && suggestions.length > 0 && (
         <View style={styles.list}>
           {suggestions.map((s) => (
@@ -116,6 +129,7 @@ const styles = StyleSheet.create({
   input: { fontSize: 17, color: C.ink, paddingVertical: 6, fontWeight: '600' },
   placeholderBox: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 34, justifyContent: 'center' },
   placeholder: { fontSize: 17, color: '#A1A1A6', fontWeight: '500' },
+  down: { marginLeft: 22, marginTop: 4, fontSize: 12.5, color: C.muted, lineHeight: 17 },
   clear: { fontSize: 24, color: '#A1A1A6', paddingHorizontal: 4 },
   quick: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginLeft: 22, marginTop: 4 },
   placeChip: { backgroundColor: '#F0F0F2', borderColor: '#E0E0E5' },

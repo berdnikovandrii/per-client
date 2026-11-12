@@ -1,4 +1,5 @@
 // Home: the next ride (if there is one) and the shortest way to book another.
+import { useState } from 'react';
 import { Image, Linking, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import RideCard from '../components/ride-card';
 import { AIRPORTS } from '../components/address-input';
@@ -10,6 +11,7 @@ import { C } from '../theme';
 
 type Props = { me: Me; rides: Ride[]; refreshing: boolean; onRefresh: () => void; onBook: (prefill?: Prefill) => void; onOpen: (r: Ride) => void };
 
+const HERO_PHOTO = 172;
 const SAN = AIRPORTS[0].value;
 const LAX = AIRPORTS[1].value;
 const SHORTCUTS: { title: string; line: string; prefill: Prefill }[] = [
@@ -24,13 +26,17 @@ export default function HomeScreen({ me, rides, refreshing, onRefresh, onBook, o
     .filter((r) => isUpcoming(r) && r.ride_datetime)
     .sort((a, b) => new Date(a.ride_datetime!).getTime() - new Date(b.ride_datetime!).getTime())[0];
   const first = (me.name || '').trim().split(/\s+/)[0];
+  const [heroWidth, setHeroWidth] = useState(0);
   const due = rides.filter((r) => r.pay_url && !r.paid && r.status !== 'cancelled');
 
   return (
     <ScrollView contentContainerStyle={styles.body} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.gold} />}>
       <View style={styles.hero}>
-        <View style={styles.heroPhoto}>
-          <Image source={FLEET_PHOTO} style={styles.heroPhotoImage} resizeMode="cover" accessibilityLabel="Our fleet by San Diego Bay" />
+        <View style={styles.heroPhoto} onLayout={(e) => setHeroWidth(e.nativeEvent.layout.width)}>
+          {/* sized in points from the measured width: percentages stopped at the padding on iPhone */}
+          {heroWidth > 0 ? (
+            <Image source={FLEET_PHOTO} style={[styles.heroPhotoImage, { width: heroWidth, height: HERO_PHOTO }]} resizeMode="cover" accessibilityLabel="Our fleet by San Diego Bay" />
+          ) : null}
           <View style={styles.heroShade} />
           <Text style={styles.brand}>PACIFIC ELITE RIDES</Text>
         </View>
@@ -97,8 +103,8 @@ export default function HomeScreen({ me, rides, refreshing, onRefresh, onBook, o
 const styles = StyleSheet.create({
   body: { padding: 16, paddingBottom: 32 },
   hero: { backgroundColor: C.black, borderRadius: 22, marginBottom: 6, overflow: 'hidden' },
-  heroPhoto: { height: 168, padding: 18, overflow: 'hidden' },
-  heroPhotoImage: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
+  heroPhoto: { height: HERO_PHOTO, padding: 18, overflow: 'hidden', backgroundColor: '#1B1B1D' },
+  heroPhotoImage: { position: 'absolute', top: 0, left: 0 },
   heroShade: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(8,8,8,0.18)' },
   heroBody: { padding: 18, paddingTop: 14 },
   brand: { color: '#F1DFAE', fontSize: 11.5, letterSpacing: 3, fontWeight: '800', textShadowColor: 'rgba(0,0,0,0.7)', textShadowRadius: 6, textShadowOffset: { width: 0, height: 1 } },

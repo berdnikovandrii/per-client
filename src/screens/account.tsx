@@ -2,6 +2,8 @@
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Platform, ScrollView, Share, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import Constants from 'expo-constants';
+import * as Updates from 'expo-updates';
+import { placesDebug } from '../components/address-input';
 import { deleteAccount, PHONE, PHONE_TEL, savePlaces, saveProfile, SITE, type Me, type Place } from '../lib/api';
 import { supabase } from '../lib/supabase';
 import { C } from '../theme';
@@ -147,7 +149,7 @@ export default function AccountScreen({ me, onSaved }: { me: Me; onSaved: () => 
         <View style={styles.divider} />
         <Link text="Delete my account" danger onPress={askDelete} />
       </View>
-      <Text style={styles.version}>Pacific Elite Rides {Constants.expoConfig?.version || ''} · TCP 35857B</Text>
+      <Version />
     </ScrollView>
   );
 }
@@ -177,8 +179,29 @@ export function GuestAccount({ onSignIn }: { onSignIn: () => void }) {
         <View style={styles.divider} />
         <Link text="Terms of Service" onPress={() => Linking.openURL(`${SITE}/terms.html`)} />
       </View>
-      <Text style={styles.version}>Pacific Elite Rides {Constants.expoConfig?.version || ''} · TCP 35857B</Text>
+      <Version />
     </ScrollView>
+  );
+}
+
+/** The version line. A long press shows what support needs to know: the update this phone runs and what the
+ *  address lookup last answered. No secrets: only whether a Places key is present. */
+function Version() {
+  const details = () => {
+    const lines = [
+      `Version ${Constants.expoConfig?.version || '?'} · ${Platform.OS}`,
+      `Update: ${Updates.updateId ? Updates.updateId.slice(0, 8) : 'built-in'} · channel ${Updates.channel || '—'} · runtime ${Updates.runtimeVersion || '—'}`,
+      `Address key: ${placesDebug.hasKey ? `yes (${placesDebug.keyLength} characters)` : 'NO'}`,
+      `Address lookups: ${placesDebug.calls}`,
+      `Last answer: ${placesDebug.last}`,
+    ];
+    if (Platform.OS === 'web') console.log(lines.join('\n'));
+    else Alert.alert('App details', lines.join('\n\n'));
+  };
+  return (
+    <Text style={styles.version} onLongPress={details} suppressHighlighting>
+      Pacific Elite Rides {Constants.expoConfig?.version || ''} · TCP 35857B
+    </Text>
   );
 }
 

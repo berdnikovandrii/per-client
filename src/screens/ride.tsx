@@ -337,7 +337,7 @@ export default function RideScreen({ ride, onClose, onChanged, onBookAgain }: Pr
           <View style={[styles.card, styles.secure]}>
             <Text style={styles.secureTitle}>Secure your ride</Text>
             <Text style={styles.sub}>
-              Add a card to hold this booking. Nothing is charged now. Cancellation is free up to {hoursLabel(ride.card.free_hours)} before pickup; a later cancellation or a no-show is charged the ride price.
+              Add a card to hold this booking. Nothing is charged now. Cancellation is free up to {hoursLabel(ride.card.free_hours)} before pickup; a later cancellation or a no-show is charged the ride price plus a 3.5% card fee.
             </Text>
             <TouchableOpacity style={styles.dark} onPress={addCard} disabled={busy === 'card'}>
               {busy === 'card' ? <ActivityIndicator color={C.gold} /> : <Text style={styles.darkText}>Add a card · no charge</Text>}

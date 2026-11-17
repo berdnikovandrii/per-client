@@ -60,6 +60,9 @@ export type Ride = {
   pay_kind: 'deposit' | 'invoice' | null;
   /** no invoice yet, but the rider may open one himself (ride confirmed, price set) */
   can_pay: boolean;
+  /** "Secure your ride": a card on file for the no-show / late-cancellation policy. Null when the ride does not
+   *  take one (not confirmed yet, a partner's ride, the demo account). Nothing is charged when the card is added. */
+  card?: { saved: boolean; brand: string | null; last4: string | null; needed: boolean; url: string; free_hours: number } | null;
   rating: number | null;
   chauffeur: string | null;
   chauffeur_phone: string | null;

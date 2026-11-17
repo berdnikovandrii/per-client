@@ -23,8 +23,12 @@ const STEPS: { key: RideStatus; label: string }[] = [
 
 type Props = { ride: Ride; onClose: () => void; onChanged: () => void; onBookAgain: (r: Ride) => void };
 
+const hoursLabel = (h: number) => `${h} hour${h === 1 ? '' : 's'}`;
+const BRANDS: Record<string, string> = { VISA: 'Visa', MASTERCARD: 'Mastercard', AMERICAN_EXPRESS: 'Amex', DISCOVER: 'Discover' };
+const brandName = (b: string | null) => (b ? BRANDS[b] || b.replace(/_/g, ' ') : 'Card');
+
 export default function RideScreen({ ride, onClose, onChanged, onBookAgain }: Props) {
-  const [busy, setBusy] = useState<'' | 'cancel' | 'pay' | 'rate'>('');
+  const [busy, setBusy] = useState<'' | 'cancel' | 'pay' | 'rate' | 'card'>('');
   const [error, setError] = useState('');
   const [note, setNote] = useState('');
   const [stars, setStars] = useState(ride.rating || 0);
@@ -81,6 +85,22 @@ export default function RideScreen({ ride, onClose, onChanged, onBookAgain }: Pr
       if (Platform.OS === 'web') await Linking.openURL(url);
       else await WebBrowser.openBrowserAsync(url, { presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET });
       onChanged(); // back from the payment page: Square reports the payment within a minute
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy('');
+    }
+  }
+
+  /** "Secure your ride": Square's card form on our page. Nothing is charged; the app only opens the page. */
+  async function addCard() {
+    if (!ride.card?.url) return;
+    setBusy('card');
+    setError('');
+    try {
+      if (Platform.OS === 'web') await Linking.openURL(ride.card.url);
+      else await WebBrowser.openBrowserAsync(ride.card.url, { presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET });
+      onChanged(); // back from the page: the card shows as saved
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -313,6 +333,26 @@ export default function RideScreen({ ride, onClose, onChanged, onBookAgain }: Pr
           )}
         </View>
 
+        {ride.card?.needed ? (
+          <View style={[styles.card, styles.secure]}>
+            <Text style={styles.secureTitle}>Secure your ride</Text>
+            <Text style={styles.sub}>
+              Add a card to hold this booking. Nothing is charged now. Cancellation is free up to {hoursLabel(ride.card.free_hours)} before pickup; a later cancellation or a no-show is charged the ride price.
+            </Text>
+            <TouchableOpacity style={styles.dark} onPress={addCard} disabled={busy === 'card'}>
+              {busy === 'card' ? <ActivityIndicator color={C.gold} /> : <Text style={styles.darkText}>Add a card · no charge</Text>}
+            </TouchableOpacity>
+            <Text style={styles.hint}>The card is entered on a secure Square page. You can still pay by Zelle, Venmo or card.</Text>
+          </View>
+        ) : ride.card?.saved ? (
+          <View style={styles.card}>
+            <Text style={styles.secureTitle}>✓ Card on file{ride.card.last4 ? ` · ${brandName(ride.card.brand)} •••• ${ride.card.last4}` : ''}</Text>
+            <Text style={styles.sub}>
+              Nothing was charged. It is used only for a no-show or a cancellation later than {hoursLabel(ride.card.free_hours)} before pickup.
+            </Text>
+          </View>
+        ) : null}
+
         {!!error && <Text style={styles.error}>{error}</Text>}
         {!live && (
           <TouchableOpacity style={[styles.dark, { marginTop: 0, marginBottom: 12 }]} onPress={() => onBookAgain(ride)}>
@@ -389,6 +429,8 @@ const styles = StyleSheet.create({
   star: { fontSize: 38, color: '#DADADF' },
   starOn: { color: C.gold },
   comment: { borderWidth: 1, borderColor: C.line, borderRadius: 12, padding: 12, fontSize: 15, color: C.ink, minHeight: 64, marginTop: 10, textAlignVertical: 'top' },
+  secure: { borderWidth: 1, borderColor: C.gold },
+  secureTitle: { fontSize: 16, fontWeight: '800', color: C.ink, marginBottom: 2 },
   dark: { backgroundColor: C.black, borderRadius: 12, paddingVertical: 15, alignItems: 'center', marginTop: 14 },
   darkText: { color: C.gold, fontSize: 16, fontWeight: '800' },
   actions: { flexDirection: 'row', gap: 10, marginTop: 12 },

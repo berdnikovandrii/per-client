@@ -27,6 +27,8 @@ const STEPS: { key: RideStatus; label: string }[] = [
 type Props = { ride: Ride; onClose: () => void; onChanged: () => void; onBookAgain: (r: Ride) => void };
 
 const hoursLabel = (h: number) => `${h} hour${h === 1 ? '' : 's'}`;
+/** What one car of a multi-car booking is doing right now. */
+const STAGE_NOTE: Record<string, string> = { on_my_way: 'On the way', picked_up: 'On board', done: 'Finished' };
 const BRANDS: Record<string, string> = { VISA: 'Visa', MASTERCARD: 'Mastercard', AMERICAN_EXPRESS: 'Amex', DISCOVER: 'Discover' };
 const brandName = (b: string | null) => (b ? BRANDS[b] || b.replace(/_/g, ' ') : 'Card');
 
@@ -47,6 +49,8 @@ export default function RideScreen({ ride, onClose, onChanged, onBookAgain }: Pr
   const s = STATUS[ride.status];
   const at = STEPS.findIndex((x) => x.key === ride.status);
   const chauffeurLine = [ride.car, ride.plate].filter(Boolean).join(' · ');
+  // a booking with several cars lists every chauffeur; one car keeps the single card
+  const team = (ride.vehicles || []).filter((v) => v && (v.chauffeur || v.car));
   const live = ride.status !== 'cancelled' && ride.status !== 'completed';
   const airportPickup = isAirportText(ride.pickup);
   const rc = receipt(ride);
@@ -269,7 +273,34 @@ export default function RideScreen({ ride, onClose, onChanged, onBookAgain }: Pr
           </Rise>
         ) : null}
 
-        {(ride.chauffeur || chauffeurLine) && ride.status !== 'cancelled' ? (
+        {team.length > 1 && ride.status !== 'cancelled' ? (
+          <Rise delay={180}>
+            <Card style={{ gap: 14 }}>
+              <Label>{`Your chauffeurs · ${team.length} vehicles`}</Label>
+              {team.map((v, i) => {
+                const tel = (v.chauffeur_phone || '').replace(/[^\d+]/g, '');
+                const line = [v.car, v.plate, STAGE_NOTE[v.stage || '']].filter(Boolean).join(' · ');
+                return (
+                  <View key={i} style={[{ flexDirection: 'row', alignItems: 'center', gap: 14 }, i > 0 && styles.teamRow]}>
+                    <View style={styles.avatar}>
+                      <Text style={styles.avatarText}>{(v.chauffeur || '·').trim().charAt(0).toUpperCase()}</Text>
+                    </View>
+                    <View style={{ flex: 1, gap: 3 }}>
+                      <Text style={styles.name}>{v.chauffeur || 'Assigned soon'}</Text>
+                      {line ? <Text style={styles.sub}>{line}</Text> : null}
+                    </View>
+                    {tel ? (
+                      <GhostButton label="Call" icon="phone" style={{ height: 44, borderRadius: 22, paddingHorizontal: 16 }} onPress={() => open(`tel:${tel}`)} />
+                    ) : null}
+                  </View>
+                );
+              })}
+              {!team.some((v) => v.chauffeur_phone) && ride.status === 'confirmed' ? (
+                <Text style={styles.hint}>Call buttons appear here a day before the pickup.</Text>
+              ) : null}
+            </Card>
+          </Rise>
+        ) : (ride.chauffeur || chauffeurLine) && ride.status !== 'cancelled' ? (
           <Rise delay={180}>
             <Card style={{ gap: 14 }}>
               <Label>Your chauffeur</Label>
@@ -463,6 +494,7 @@ const styles = StyleSheet.create({
   name: { fontSize: 17, fontWeight: '600', color: C.ink },
   sub: { fontSize: 13.5, lineHeight: 19, color: C.muted },
   hint: { fontSize: 12.5, lineHeight: 18, color: C.muted },
+  teamRow: { paddingTop: 14, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.lineHi },
   hintCenter: { fontSize: 12, lineHeight: 17, color: C.muted, textAlign: 'center' },
   avatar: { width: 52, height: 52, borderRadius: 26, alignItems: 'center', justifyContent: 'center', backgroundColor: C.raised, borderWidth: 1, borderColor: 'rgba(200,168,95,0.5)' },
   avatarText: { ...SERIF, fontSize: 26, lineHeight: 30, color: C.goldHi },

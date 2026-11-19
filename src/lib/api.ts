@@ -31,6 +31,9 @@ export type Me = {
 
 export type RideStatus = 'requested' | 'confirmed' | 'on_the_way' | 'on_board' | 'completed' | 'cancelled';
 
+/** One car of a booking that has several. */
+export type RideVehicle = { chauffeur: string | null; chauffeur_phone: string | null; car: string | null; plate: string | null; stage: string | null };
+
 export type Ride = {
   id: number;
   status: RideStatus;
@@ -68,6 +71,9 @@ export type Ride = {
   chauffeur_phone: string | null;
   car: string | null;
   plate: string | null;
+  /** how many cars are on this booking, and (only when more than one) each car with its chauffeur */
+  vehicle_count?: number | null;
+  vehicles?: RideVehicle[] | null;
   stage: string | null;
   stage_at: string | null;
   /** where the car is — only while the chauffeur is on the way or the rider is on board */

@@ -20,9 +20,24 @@ is on the way.
 npm install
 npx tsc --noEmit                       # typecheck
 npx expo export -p ios --output-dir dist-ios   # bundle check
-npx eas-cli@latest build --platform ios --profile production   # App Store build (asks for the Apple login)
-npx eas-cli@latest submit --platform ios --latest              # send it to App Store Connect
 ```
+
+Shipping needs no terminal: GitHub → Actions → **Ship** → Run workflow (`.github/workflows/build.yml`).
+`store` makes an App Store build and sends it to App Store Connect; `update` publishes an over-the-air update
+for the version already in the store. The Apple certificate, the App Store Connect key and the app's values
+(Supabase, Google Places, Meta) live on expo.dev, not in the repository.
+
+## 1.0.1 (2026-11-18): the Noir Concierge design
+
+- Dark theme with one gold accent and serif headings (Cormorant Garamond, lining figures). Colours and the
+  serif live in `src/theme.ts`; the building blocks (gold button with a sheen, cards, chips, segment, fields,
+  rise-in and press motion, haptics) in `src/components/ui.tsx`; the line icons in `src/components/icon.tsx`.
+- New native modules, so this version needs a store build: `expo-linear-gradient`, `expo-blur`,
+  `react-native-svg`, `expo-haptics`, `react-native-fbsdk-next`.
+- Meta SDK (`app.config.js`): counts installs from ads through Apple's anonymous SKAdNetwork — no tracking
+  prompt, no advertising ID. One app event, "Schedule", when a ride request is sent (`src/lib/analytics.ts`).
+  `META_APP_ID` and `META_CLIENT_TOKEN` must be set in the EAS production environment or the iOS build stops.
+- Design mockups: https://claude.ai/artifact/5acKWfQEWQSAzNypXxVALu
 
 ## Also in 1.0 (second round, 2026-11-11)
 
@@ -33,5 +48,5 @@ Backend for these: `supabase/client_app_v2.sql` in the CRM repo.
 
 ## Not in 1.0
 
-Live map of the chauffeur (needs GPS in PER Driver) and Spanish — planned as 1.1. Android — later; needs a Google
+Spanish — planned. Android — later; needs a Google
 Play account.

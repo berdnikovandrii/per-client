@@ -1,16 +1,21 @@
 // Book a ride: where, when, how many, which car — with the price right away when the rate card knows it.
 // The request goes to dispatch as a lead; the rider gets a push when it is confirmed.
 // A guest can fill in everything and see the price; the email code is asked only at "Request this ride".
-import { useMemo, useState } from 'react';
-import { ActivityIndicator, Image, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import AddressInput from '../components/address-input';
-import WhenInput from '../components/when-input';
+import { useEffect, useMemo, useState } from 'react';
+import { Image, Keyboard, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { BlurView } from 'expo-blur';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AddressInput, { ADDRESS_DOT_Y, QuickPicks } from '../components/address-input';
+import { WhenField, WhenPicker } from '../components/when-input';
+import Icon from '../components/icon';
+import { Card, Field, GoldButton, haptic, Medal, Rise, RouteRail, Segment, Stepper, T, Tap } from '../components/ui';
+import { trackBooking } from '../lib/analytics';
 import { book, money, PHONE, type Booking, type Me } from '../lib/api';
 import { estimate, INCLUDED, VEHICLES, type VehicleKey } from '../lib/estimate';
 import { CAR_PHOTO } from '../lib/photos';
 import { supabase } from '../lib/supabase';
 import Login from './login';
-import { C } from '../theme';
+import { C, SERIF } from '../theme';
 
 export type Prefill = { pickup?: string; dropoff?: string; tripType?: Booking['trip_type']; stops?: string[]; passengers?: number; vehicle?: VehicleKey; hours?: number };
 
@@ -49,6 +54,19 @@ export default function BookScreen({ me, prefill, first, onClose, onBooked }: { 
   const [error, setError] = useState('');
   const [done, setDone] = useState<number | null>(null);
   const [askSignIn, setAskSignIn] = useState(false);
+  const insets = useSafeAreaInsets();
+  const [picking, setPicking] = useState<'' | 'when' | 'back'>('');
+  const [dropY, setDropY] = useState(0); // where the drop-off field starts: the route line ends at its dot
+  // while the keyboard is up, the bottom bar shrinks to the price line so the form keeps its room
+  const [typing, setTyping] = useState(false);
+  useEffect(() => {
+    const show = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow', () => setTyping(true));
+    const hide = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide', () => setTyping(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
 
   const minHours = vehicle === 'Sprinter' ? 4 : 2;
   const shownHours = Math.max(minHours, hours);
@@ -64,6 +82,7 @@ export default function BookScreen({ me, prefill, first, onClose, onBooked }: { 
   }
 
   async function send() {
+    Keyboard.dismiss();
     setError('');
     if (!pickup.trim()) return setError('Where should we pick you up?');
     if (tripType !== 'Hourly' && !dropoff.trim()) return setError('Where are you going?');
@@ -98,6 +117,8 @@ export default function BookScreen({ me, prefill, first, onClose, onBooked }: { 
         extras,
         ref: first ? refCode.trim() : '',
       });
+      haptic.success();
+      trackBooking(est?.amount ?? null);
       setDone(id);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -122,271 +143,220 @@ export default function BookScreen({ me, prefill, first, onClose, onBooked }: { 
   if (done != null) {
     return (
       <View style={styles.doneScreen}>
-        <View style={styles.doneBadge}>
-          <Text style={styles.doneMark}>✓</Text>
-        </View>
-        <Text style={styles.doneTitle}>Request sent</Text>
-        <Text style={styles.doneText}>
-          We are checking the schedule now and will confirm shortly{est?.amount ? ` at ${money(est.amount)}` : ' with your price'}. You will get a
-          notification, and the ride appears under My rides.
-        </Text>
-        <TouchableOpacity style={[styles.primary, styles.doneButton]} onPress={() => onBooked(done)}>
-          <Text style={styles.primaryText}>See my rides</Text>
-        </TouchableOpacity>
+        <Medal icon="check" pop />
+        <Rise delay={150} style={{ alignItems: 'center', alignSelf: 'stretch' }}>
+          <Text style={styles.doneTitle}>Request sent</Text>
+          <Text style={styles.doneText}>
+            We are checking the schedule now and will confirm shortly{est?.amount ? ` at ${money(est.amount)}` : ' with your price'}. You will get a
+            notification, and the ride appears under My rides.
+          </Text>
+          <GoldButton label="See my rides" arrow onPress={() => onBooked(done)} style={{ alignSelf: 'stretch', marginTop: 28 }} />
+        </Rise>
       </View>
     );
   }
 
+  const airport = isAirport(pickup) || isAirport(dropoff);
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: C.bg }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Book a ride</Text>
-        <TouchableOpacity onPress={onClose} hitSlop={10}>
-          <Text style={styles.headerClose}>Close</Text>
-        </TouchableOpacity>
+      <View style={[styles.header, Platform.OS !== 'ios' && { paddingTop: insets.top + 14 }]}>
+        <Text style={[T.title, { fontSize: 38 }]} accessibilityRole="header">Book a ride</Text>
+        <Tap onPress={onClose} hitSlop={10} style={styles.close} accessibilityRole="button">
+          <Text style={styles.closeText}>Close</Text>
+        </Tap>
       </View>
-      <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
-        <View style={styles.segment}>
-          {TRIPS.map((t) => (
-            <TouchableOpacity
-              key={t}
-              style={[styles.segmentItem, tripType === t && styles.segmentOn]}
-              onPress={() => {
-                setTripType(t);
-                if (t !== 'Hourly' && vehicle === 'Sprinter') setVehicle('SUV');
-              }}
-            >
-              <Text style={[styles.segmentText, tripType === t && styles.segmentTextOn]}>{t}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+      <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <Segment
+          items={TRIPS}
+          value={tripType}
+          onChange={(t) => {
+            setTripType(t);
+            setPicking('');
+            if (t !== 'Hourly' && vehicle === 'Sprinter') setVehicle('SUV');
+          }}
+        />
 
-        <View style={styles.card}>
-          <AddressInput label="Pickup" value={pickup} onChange={setPickup} placeholder="Address, hotel or airport" places={me.places} />
-          {stops.map((s, i) => (
-            <View key={i} style={styles.stopRow}>
+        <Rise>
+          <Card gold style={styles.route}>
+            <View style={{ flexDirection: 'row', gap: 14 }}>
+              <View style={{ width: 9, paddingTop: ADDRESS_DOT_Y - 4.5 }}>{dropY > 0 ? <RouteRail height={dropY + 9} grow /> : null}</View>
               <View style={{ flex: 1 }}>
-                <AddressInput label={`Stop ${i + 1}`} value={s} onChange={(t) => setStops((list) => list.map((x, j) => (j === i ? t : x)))} placeholder="Address of the stop" />
-              </View>
-              <TouchableOpacity onPress={() => setStops((list) => list.filter((_, j) => j !== i))} hitSlop={8}>
-                <Text style={styles.remove}>Remove</Text>
-              </TouchableOpacity>
-            </View>
-          ))}
-          <View style={styles.divider} />
-          <AddressInput
-            label={tripType === 'Hourly' ? 'Drop-off (optional)' : 'Drop-off'}
-            value={dropoff}
-            onChange={setDropoff}
-            placeholder={tripType === 'Hourly' ? 'Where the ride ends' : 'Address, hotel or airport'}
-            dot="gold"
-            places={me.places}
-          />
-          {stops.length < 3 && tripType !== 'Hourly' && (
-            <TouchableOpacity onPress={() => setStops((list) => [...list, ''])} style={{ marginLeft: 22, marginTop: 2 }}>
-              <Text style={styles.addStop}>+ Add a stop</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        <View style={styles.card}>
-          <WhenInput label="Pickup time" value={when} onChange={setWhen} min={new Date()} />
-          {tripType === 'Round trip' && (
-            <>
-              <View style={styles.divider} />
-              <WhenInput label="Return" value={back} onChange={setBack} min={when} />
-            </>
-          )}
-          {tripType === 'Hourly' && (
-            <>
-              <View style={styles.divider} />
-              <Stepper label="Hours" value={shownHours} min={minHours} max={12} onChange={setHours} note={`${minHours} h minimum`} />
-            </>
-          )}
-          <View style={styles.divider} />
-          <Stepper label="Passengers" value={passengers} min={1} max={14} onChange={(n) => {
-            setPassengers(n);
-            if (n > 6 && vehicle === 'SUV' && tripType === 'Hourly') setVehicle('Sprinter');
-          }} note={passengers > seats ? `over ${seats} for this car` : undefined} />
-        </View>
-
-        <Text style={styles.section}>Vehicle</Text>
-        <View style={styles.vehicles}>
-          {VEHICLES.map((v) => {
-            const on = vehicle === v.key;
-            return (
-              <TouchableOpacity key={v.key} style={[styles.vehicle, on && styles.vehicleOn]} onPress={() => pickVehicle(v.key)} activeOpacity={0.85} accessibilityState={{ selected: on }}>
-                <Image source={CAR_PHOTO[v.key]} style={styles.vehiclePhoto} resizeMode="cover" accessibilityIgnoresInvertColors />
-                <View style={styles.vehicleBody}>
-                  <Text style={[styles.vehicleName, on && styles.vehicleNameOn]}>{v.name}</Text>
-                  <Text style={[styles.vehicleLine, on && { color: '#D8D8DC' }]}>{v.line}</Text>
+                <AddressInput label="Pickup" value={pickup} onChange={setPickup} placeholder="Address, hotel or airport" places={me.places} />
+                {stops.map((st, i) => (
+                  <View key={i} style={styles.stopRow}>
+                    <View style={{ flex: 1 }}>
+                      <AddressInput label={`Stop ${i + 1}`} value={st} onChange={(t) => setStops((list) => list.map((x, j) => (j === i ? t : x)))} placeholder="Address of the stop" quick={false} />
+                    </View>
+                    <Tap onPress={() => setStops((list) => list.filter((_, j) => j !== i))} hitSlop={8} style={{ height: 44, justifyContent: 'center' }} accessibilityRole="button" accessibilityLabel={`Remove stop ${i + 1}`}>
+                      <Text style={styles.remove}>Remove</Text>
+                    </Tap>
+                  </View>
+                ))}
+                <View onLayout={(e) => setDropY(e.nativeEvent.layout.y)}>
+                  <AddressInput
+                    label={tripType === 'Hourly' ? 'Drop-off (optional)' : 'Drop-off'}
+                    value={dropoff}
+                    onChange={setDropoff}
+                    placeholder={tripType === 'Hourly' ? 'Where the ride ends' : 'Address, hotel or airport'}
+                    quick={false}
+                  />
                 </View>
-              </TouchableOpacity>
-            );
-          })}
+              </View>
+            </View>
+            <View style={{ marginLeft: 23 }}>
+              {!dropoff.trim() ? <QuickPicks places={me.places} onPick={setDropoff} /> : null}
+              {stops.length < 3 && tripType !== 'Hourly' ? (
+                <Tap onPress={() => setStops((list) => [...list, ''])} style={styles.addStop} accessibilityRole="button">
+                  <Text style={styles.addStopText}>+ Add a stop</Text>
+                </Tap>
+              ) : <View style={{ height: 10 }} />}
+            </View>
+          </Card>
+        </Rise>
+
+        <View style={styles.pair}>
+          <WhenField label="Pickup time" value={when} onChange={setWhen} min={new Date()} open={picking === 'when'} onToggle={() => setPicking((p) => (p === 'when' ? '' : 'when'))} style={{ flex: 1.55 }} />
+          <Stepper
+            label="Passengers"
+            value={passengers}
+            min={1}
+            max={14}
+            style={{ flex: 1 }}
+            onChange={(n) => {
+              setPassengers(n);
+              if (n > 6 && vehicle === 'SUV' && tripType === 'Hourly') setVehicle('Sprinter');
+            }}
+          />
+        </View>
+        {picking === 'when' ? <WhenPicker value={when} onChange={setWhen} min={new Date()} onDone={() => setPicking('')} /> : null}
+        {passengers > seats ? <Text style={styles.over}>More than {seats} for this car: we will send two SUVs or the Sprinter and confirm the price.</Text> : null}
+        {tripType === 'Round trip' && (
+          <>
+            <WhenField label="Return" value={back} onChange={setBack} min={when} open={picking === 'back'} onToggle={() => setPicking((p) => (p === 'back' ? '' : 'back'))} />
+            {picking === 'back' ? <WhenPicker value={back} onChange={setBack} min={when} onDone={() => setPicking('')} /> : null}
+          </>
+        )}
+        {tripType === 'Hourly' && <Stepper label="Hours" value={shownHours} min={minHours} max={12} onChange={setHours} note={`${minHours} h minimum`} />}
+
+        <View style={{ gap: 8 }}>
+          <Text style={T.fieldLabel}>Vehicle</Text>
+          <View style={styles.pair}>
+            {VEHICLES.map((v) => {
+              const on = vehicle === v.key;
+              return (
+                <Tap key={v.key} style={[styles.vehicle, on && styles.vehicleOn]} feedback="select" onPress={() => pickVehicle(v.key)} accessibilityRole="button" accessibilityLabel={`${v.name}. ${v.line}`} accessibilityState={{ selected: on }}>
+                  <Image source={CAR_PHOTO[v.key]} style={[styles.vehiclePhoto, !on && { opacity: 0.7 }]} resizeMode="cover" accessibilityIgnoresInvertColors />
+                  {on ? (
+                    <View style={styles.vehicleCheck}>
+                      <Icon name="check" size={12} color={C.onGold} stroke={2.6} />
+                    </View>
+                  ) : null}
+                  <Text style={styles.vehicleName}>{v.name}</Text>
+                  <Text style={styles.vehicleLine}>{v.line}</Text>
+                </Tap>
+              );
+            })}
+          </View>
         </View>
 
-        <Text style={styles.section}>Extras</Text>
-        <View style={styles.extras}>
-          {EXTRAS.map((x) => {
-            const on = extras.includes(x);
-            return (
-              <TouchableOpacity key={x} style={[styles.extra, on && styles.extraOn]} onPress={() => setExtras((list) => (on ? list.filter((y) => y !== x) : [...list, x]))}>
-                <Text style={[styles.extraText, on && styles.extraTextOn]}>{on ? '✓ ' : ''}{x}</Text>
-              </TouchableOpacity>
-            );
-          })}
+        <View style={{ gap: 8 }}>
+          <Text style={T.fieldLabel}>Extras</Text>
+          <View style={styles.extras}>
+            {EXTRAS.map((x) => {
+              const on = extras.includes(x);
+              return (
+                <Tap key={x} style={[styles.extra, on && styles.extraOn]} feedback="select" onPress={() => setExtras((list) => (on ? list.filter((y) => y !== x) : [...list, x]))} accessibilityRole="checkbox" accessibilityState={{ checked: on }} accessibilityLabel={x}>
+                  {on ? <Icon name="check" size={14} color={C.onGold} stroke={2.6} /> : null}
+                  <Text style={[styles.extraText, on && styles.extraTextOn]}>{x}</Text>
+                </Tap>
+              );
+            })}
+          </View>
         </View>
 
-        <View style={styles.card}>
-          {(isAirport(pickup) || isAirport(dropoff)) && (
+        {airport ? <Field label="Flight number" value={flight} onChangeText={(t) => setFlight(t.toUpperCase())} placeholder="e.g. UA444 — we track delays" autoCapitalize="characters" autoCorrect={false} /> : null}
+        <Field label="Note for the chauffeur" value={note} onChangeText={setNote} placeholder="Luggage, child seat, gate code…" multiline />
+
+        <View style={{ gap: 12, marginTop: 6 }}>
+          <Text style={T.h2}>Your details</Text>
+          <Field label="Name" value={name} onChangeText={setName} placeholder="First and last name" textContentType="name" />
+          <Field label="Mobile" value={phone} onChangeText={setPhone} placeholder="(619) 555-1234" keyboardType="phone-pad" textContentType="telephoneNumber" autoCorrect={false} />
+          <Tap style={styles.other} onPress={() => setForOther((v) => !v)} feedback="select" to={0.99} accessibilityRole="checkbox" accessibilityState={{ checked: forOther }}>
+            <View style={[styles.check, forOther && styles.checkOn]}>{forOther ? <Icon name="check" size={14} color={C.onGold} stroke={2.6} /> : null}</View>
+            <Text style={styles.otherText}>I am booking for someone else</Text>
+          </Tap>
+          {forOther && (
             <>
-              <Field label="Flight number" value={flight} onChange={(t) => setFlight(t.toUpperCase())} placeholder="e.g. UA444 — we track delays" caps />
-              <View style={styles.divider} />
+              <Field label="Passenger name" value={passengerName} onChangeText={setPassengerName} placeholder="Who is riding" />
+              <Field label="Passenger mobile" value={passengerPhone} onChangeText={setPassengerPhone} placeholder="The chauffeur calls this number" keyboardType="phone-pad" autoCorrect={false} />
             </>
           )}
-          <Field label="Note for the chauffeur" value={note} onChange={setNote} placeholder="Luggage, child seat, gate code…" multiline />
+          {first && <Field label="Invite code (optional)" value={refCode} onChangeText={(t) => setRefCode(t.toUpperCase())} placeholder="A friend's code, if you have one" autoCapitalize="characters" autoCorrect={false} />}
         </View>
 
-        <Text style={styles.section}>Your details</Text>
-        <View style={styles.card}>
-          <Field label="Name" value={name} onChange={setName} placeholder="First and last name" />
-          <View style={styles.divider} />
-          <Field label="Mobile" value={phone} onChange={setPhone} placeholder="(619) 555-1234" phone />
+        <View style={styles.terms}>
+          {est ? <Text style={styles.termsLead}>{est.basis}</Text> : null}
+          {est?.amount != null ? <Text style={styles.termsText}>{INCLUDED}</Text> : null}
+          <Text style={styles.termsText}>No payment now. We confirm the ride first; you pay by Zelle, Venmo or card after that.</Text>
         </View>
-
-        <TouchableOpacity style={styles.other} onPress={() => setForOther((v) => !v)} activeOpacity={0.7}>
-          <View style={[styles.check, forOther && styles.checkOn]}>{forOther ? <Text style={styles.checkMark}>✓</Text> : null}</View>
-          <Text style={styles.otherText}>I am booking for someone else</Text>
-        </TouchableOpacity>
-        {forOther && (
-          <View style={styles.card}>
-            <Field label="Passenger name" value={passengerName} onChange={setPassengerName} placeholder="Who is riding" />
-            <View style={styles.divider} />
-            <Field label="Passenger mobile" value={passengerPhone} onChange={setPassengerPhone} placeholder="The chauffeur calls this number" phone />
-          </View>
-        )}
-        {first && (
-          <View style={styles.card}>
-            <Field label="Invite code (optional)" value={refCode} onChange={(t) => setRefCode(t.toUpperCase())} placeholder="A friend's code, if you have one" caps />
-          </View>
-        )}
-
-        {est && (
-          <View style={[styles.estimate, est.amount == null && styles.estimateCustom]}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.estimateTitle}>{est.title}</Text>
-              <Text style={styles.estimateBasis}>{est.basis}</Text>
-              {est.amount != null && <Text style={styles.estimateIncl}>{INCLUDED}</Text>}
-            </View>
-            {est.amount != null && <Text style={styles.estimateAmount}>{money(est.amount)}</Text>}
-          </View>
-        )}
-        {!!error && <Text style={styles.error}>{error}</Text>}
-        <TouchableOpacity style={[styles.primary, busy && { opacity: 0.7 }]} onPress={send} disabled={busy}>
-          {busy ? <ActivityIndicator color={C.gold} /> : <Text style={styles.primaryText}>Request this ride</Text>}
-        </TouchableOpacity>
-        <Text style={styles.small}>No payment now. We confirm the ride first; you pay by Zelle, Venmo or card after that.</Text>
       </ScrollView>
+
+      <View style={[styles.bar, { paddingBottom: typing ? 12 : Math.max(insets.bottom, 16) }]}>
+        <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(18,18,19,0.82)' }]} />
+        <View style={styles.barTop}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.barTitle} numberOfLines={1}>{est ? est.title : 'Your price'}</Text>
+            <Text style={styles.barLine} numberOfLines={2}>
+              {est?.amount != null ? 'Fuel and tolls included' : est ? 'We confirm the price, usually within 15 minutes' : 'Add pickup and drop-off to see it'}
+            </Text>
+          </View>
+          {est?.amount != null ? <Text style={styles.barPrice}>{money(est.amount)}</Text> : null}
+        </View>
+        {!!error && <Text style={styles.error} accessibilityLiveRegion="polite">{error}</Text>}
+        {typing ? null : <GoldButton label="Request this ride" onPress={send} busy={busy} />}
+      </View>
     </KeyboardAvoidingView>
   );
 }
 
-function Stepper({ label, value, min, max, onChange, note }: { label: string; value: number; min: number; max: number; onChange: (n: number) => void; note?: string }) {
-  return (
-    <View style={styles.stepRow}>
-      <View style={{ flex: 1 }}>
-        <Text style={styles.stepLabel}>{label}</Text>
-        {note ? <Text style={styles.stepNote}>{note}</Text> : null}
-      </View>
-      <TouchableOpacity style={[styles.stepBtn, value <= min && styles.stepBtnOff]} onPress={() => onChange(Math.max(min, value - 1))} disabled={value <= min} accessibilityLabel={`Fewer ${label}`}>
-        <Text style={styles.stepBtnText}>−</Text>
-      </TouchableOpacity>
-      <Text style={styles.stepValue}>{value}</Text>
-      <TouchableOpacity style={[styles.stepBtn, value >= max && styles.stepBtnOff]} onPress={() => onChange(Math.min(max, value + 1))} disabled={value >= max} accessibilityLabel={`More ${label}`}>
-        <Text style={styles.stepBtnText}>+</Text>
-      </TouchableOpacity>
-    </View>
-  );
-}
-
-function Field({ label, value, onChange, placeholder, multiline, phone, caps }: { label: string; value: string; onChange: (t: string) => void; placeholder: string; multiline?: boolean; phone?: boolean; caps?: boolean }) {
-  return (
-    <View style={{ paddingVertical: 10 }}>
-      <Text style={styles.fieldLabel}>{label}</Text>
-      <TextInput
-        style={[styles.fieldInput, multiline && { minHeight: 44 }]}
-        value={value}
-        onChangeText={onChange}
-        placeholder={placeholder}
-        placeholderTextColor="#A1A1A6"
-        multiline={multiline}
-        keyboardType={phone ? 'phone-pad' : 'default'}
-        textContentType={phone ? 'telephoneNumber' : undefined}
-        autoCapitalize={caps ? 'characters' : phone ? 'none' : 'sentences'}
-        autoCorrect={!caps && !phone}
-      />
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, paddingTop: 18, paddingBottom: 12, backgroundColor: C.bg },
-  headerTitle: { fontSize: 26, fontWeight: '800', color: C.ink },
-  headerClose: { fontSize: 16, fontWeight: '700', color: C.muted },
-  body: { padding: 16, paddingBottom: 48 },
-  segment: { flexDirection: 'row', backgroundColor: '#E9E9EC', borderRadius: 12, padding: 3, marginBottom: 12 },
-  segmentItem: { flex: 1, alignItems: 'center', paddingVertical: 9, borderRadius: 10 },
-  segmentOn: { backgroundColor: '#fff' },
-  segmentText: { fontSize: 14.5, fontWeight: '600', color: C.muted },
-  segmentTextOn: { color: C.ink, fontWeight: '800' },
-  card: { backgroundColor: C.card, borderRadius: 16, paddingHorizontal: 16, paddingVertical: 4, marginBottom: 12 },
-  divider: { height: StyleSheet.hairlineWidth, backgroundColor: C.line },
-  stopRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  remove: { color: C.red, fontSize: 13, fontWeight: '700' },
-  addStop: { color: C.goldText, fontSize: 14, fontWeight: '700', paddingVertical: 10 },
-  section: { fontSize: 12, fontWeight: '700', color: C.muted, textTransform: 'uppercase', letterSpacing: 0.8, marginTop: 6, marginBottom: 8, marginLeft: 4 },
-  vehicles: { flexDirection: 'row', gap: 10, marginBottom: 12 },
-  vehicle: { flex: 1, backgroundColor: C.card, borderRadius: 16, borderWidth: 1.5, borderColor: 'transparent', overflow: 'hidden' },
-  vehiclePhoto: { width: '100%', height: 92, backgroundColor: '#1B1B1D' },
-  vehicleBody: { padding: 12 },
-  vehicleOn: { backgroundColor: C.ink, borderColor: C.gold },
-  vehicleName: { fontSize: 16, fontWeight: '800', color: C.ink },
-  vehicleNameOn: { color: C.gold },
-  vehicleLine: { fontSize: 12.5, color: C.muted, marginTop: 4, lineHeight: 17 },
-  extras: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
-  extra: { backgroundColor: C.card, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9, borderWidth: 1, borderColor: C.line },
-  extraOn: { backgroundColor: C.ink, borderColor: C.ink },
-  extraText: { fontSize: 14, fontWeight: '700', color: C.ink },
-  extraTextOn: { color: C.gold },
-  other: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 6, paddingHorizontal: 4, marginBottom: 10 },
-  check: { width: 24, height: 24, borderRadius: 7, borderWidth: 1.5, borderColor: '#C7C7CC', alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' },
-  checkOn: { backgroundColor: C.ink, borderColor: C.ink },
-  checkMark: { color: C.gold, fontWeight: '800', fontSize: 14 },
-  otherText: { fontSize: 15.5, fontWeight: '600', color: C.ink },
-  stepRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: 10, gap: 12 },
-  stepLabel: { fontSize: 16, fontWeight: '600', color: C.ink },
-  stepNote: { fontSize: 12, color: C.muted, marginTop: 2 },
-  stepBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#F0F0F2', alignItems: 'center', justifyContent: 'center' },
-  stepBtnOff: { opacity: 0.4 },
-  stepBtnText: { fontSize: 20, fontWeight: '700', color: C.ink, marginTop: -2 },
-  stepValue: { fontSize: 18, fontWeight: '800', color: C.ink, minWidth: 24, textAlign: 'center' },
-  fieldLabel: { fontSize: 11.5, fontWeight: '700', color: C.muted, textTransform: 'uppercase', letterSpacing: 0.6 },
-  fieldInput: { fontSize: 17, color: C.ink, paddingVertical: 6, fontWeight: '600' },
-  estimate: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: C.goldSoft, borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#E8D9A8', marginTop: 4 },
-  estimateCustom: { backgroundColor: '#fff', borderColor: C.line },
-  estimateTitle: { fontSize: 12, fontWeight: '800', color: C.goldText, textTransform: 'uppercase', letterSpacing: 1 },
-  estimateBasis: { fontSize: 14, color: C.text, marginTop: 4, lineHeight: 19 },
-  estimateIncl: { fontSize: 12, color: C.muted, marginTop: 6, lineHeight: 16 },
-  estimateAmount: { fontSize: 30, fontWeight: '800', color: C.ink },
-  error: { color: C.red, fontSize: 14.5, marginTop: 12, lineHeight: 20, fontWeight: '600' },
-  primary: { backgroundColor: C.black, borderRadius: 14, paddingVertical: 17, alignItems: 'center', marginTop: 14 },
-  primaryText: { color: C.gold, fontSize: 17, fontWeight: '800' },
-  small: { fontSize: 12.5, color: C.muted, textAlign: 'center', marginTop: 10, lineHeight: 18 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 22, paddingBottom: 10 },
+  close: { height: 44, justifyContent: 'center', paddingHorizontal: 4 },
+  closeText: { fontSize: 16, color: C.goldText },
+  body: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 28, gap: 18 },
+  route: { paddingTop: 16, paddingBottom: 6, paddingHorizontal: 18 },
+  stopRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  remove: { color: C.muted, fontSize: 13 },
+  addStop: { height: 44, justifyContent: 'center', alignSelf: 'flex-start' },
+  addStopText: { color: C.goldText, fontSize: 14, fontWeight: '600' },
+  pair: { flexDirection: 'row', gap: 12 },
+  over: { ...T.small, color: C.goldText, marginTop: -8 },
+  vehicle: { flex: 1, borderRadius: 18, overflow: 'hidden', backgroundColor: C.card, borderWidth: 1.5, borderColor: C.line, paddingBottom: 12 },
+  vehicleOn: { borderColor: C.gold },
+  vehiclePhoto: { width: '100%', height: 92, backgroundColor: C.cardHi },
+  vehicleCheck: { position: 'absolute', top: 8, right: 8, width: 22, height: 22, borderRadius: 11, backgroundColor: C.goldHi, alignItems: 'center', justifyContent: 'center' },
+  vehicleName: { fontSize: 15, fontWeight: '600', color: C.ink, paddingHorizontal: 12, marginTop: 10 },
+  vehicleLine: { fontSize: 12, lineHeight: 16, color: C.muted, paddingHorizontal: 12, marginTop: 5 },
+  extras: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  extra: { height: 44, paddingHorizontal: 16, borderRadius: 22, flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: C.card, borderWidth: 1, borderColor: C.lineHi },
+  extraOn: { backgroundColor: C.goldHi, borderColor: C.goldHi },
+  extraText: { fontSize: 14, fontWeight: '500', color: '#E9E5DC' },
+  extraTextOn: { color: C.onGold, fontWeight: '600' },
+  other: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 12 },
+  check: { width: 24, height: 24, borderRadius: 7, borderWidth: 1.5, borderColor: C.faint, alignItems: 'center', justifyContent: 'center' },
+  checkOn: { backgroundColor: C.goldHi, borderColor: C.goldHi },
+  otherText: { fontSize: 15, color: '#E9E5DC' },
+  terms: { gap: 6, paddingTop: 16, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.lineHi },
+  termsLead: { fontSize: 13.5, lineHeight: 19, color: C.text },
+  termsText: { fontSize: 12, lineHeight: 17, color: C.muted },
+  bar: { paddingTop: 14, paddingHorizontal: 20, gap: 12, borderTopWidth: 1, borderTopColor: C.line, overflow: 'hidden' },
+  barTop: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 40 },
+  barTitle: { fontSize: 14, fontWeight: '600', color: C.ink },
+  barLine: { fontSize: 12.5, lineHeight: 17, color: C.muted, marginTop: 2 },
+  barPrice: { ...SERIF, fontSize: 34, lineHeight: 40, color: C.goldHi },
+  error: { color: C.red, fontSize: 14, lineHeight: 19 },
   doneScreen: { flex: 1, backgroundColor: C.bg, alignItems: 'center', justifyContent: 'center', padding: 28 },
-  doneBadge: { width: 76, height: 76, borderRadius: 38, backgroundColor: C.greenSoft, alignItems: 'center', justifyContent: 'center' },
-  doneMark: { fontSize: 38, color: C.green, fontWeight: '800' },
-  doneTitle: { fontSize: 26, fontWeight: '800', color: C.ink, marginTop: 16 },
-  doneText: { fontSize: 15.5, color: C.text, textAlign: 'center', lineHeight: 23, marginTop: 10, marginBottom: 14 },
-  doneButton: { alignSelf: 'stretch' },
+  doneTitle: { ...T.title, marginTop: 22, textAlign: 'center' },
+  doneText: { ...T.body, color: C.text, textAlign: 'center', marginTop: 12 },
 });

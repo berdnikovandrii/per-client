@@ -5,9 +5,9 @@ import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Easing, Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { checkedAgo, FLIGHT_TONES, flightBadge, flightProgress, flightTime, isInAir, isLanded, normalizeFlight } from '../lib/flight';
 import type { FlightStatus } from '../lib/flight';
-
-// same gold as the rest of the app (the CRM file reads these from its brand module)
-const BRAND = { gold: '#C8A85F', goldText: '#8A6D1F', goldSoft: '#FBF6E9', goldLine: '#E8D9A8', ink: '#111111', black: '#080808' };
+import Icon from './icon';
+import { PulseDot } from './ui';
+import { C, SERIF } from '../theme';
 
 type Props = {
   flight: FlightStatus | null | undefined;
@@ -16,9 +16,6 @@ type Props = {
   onRefresh?: () => void;
   refreshing?: boolean;
 };
-
-// Text presentation, so iOS doesn't swap in the colour emoji and the tint applies
-const PLANE = '✈︎';
 
 /** "UA1068" / "AC 1582 (arr 3:55 PM)" → "UA 1068" / "AC 1582"; text with no flight number stays as typed. */
 function spacedNumber(n?: string | null) {
@@ -43,10 +40,8 @@ function Times({ label, planned, actual, align }: { label: string; planned?: str
   return (
     <View style={{ alignItems: align === 'left' ? 'flex-start' : 'flex-end', flexShrink: 1 }}>
       <Text style={styles.timeLabel}>{label}</Text>
-      <View style={styles.timeRow}>
-        {changed ? <Text style={styles.timeStruck}>{p}</Text> : null}
-        <Text style={styles.time}>{a || p || '—'}</Text>
-      </View>
+      <Text style={styles.time}>{a || p || '—'}</Text>
+      {changed ? <Text style={styles.timeStruck}>{p}</Text> : null}
     </View>
   );
 }
@@ -61,7 +56,7 @@ function CheckButton({ onRefresh, refreshing }: Pick<Props, 'onRefresh' | 'refre
       accessibilityRole="button"
       accessibilityLabel="Check flight status now"
     >
-      {refreshing ? <ActivityIndicator size="small" color={BRAND.goldText} /> : <Text style={styles.checkText}>Check now</Text>}
+      {refreshing ? <ActivityIndicator size="small" color={C.goldText} /> : <Text style={styles.checkText}>Check now</Text>}
     </TouchableOpacity>
   );
 }
@@ -99,7 +94,7 @@ export default function FlightCard({ flight, flightNumber, pickupAt, onRefresh, 
     return (
       <View style={styles.card}>
         <View style={styles.head}>
-          <Text style={styles.title} numberOfLines={1}>
+          <Text style={[styles.title, { marginTop: 0, flexShrink: 1 }]} numberOfLines={1}>
             {spacedNumber(flightNumber)}
           </Text>
           <View style={[styles.badge, { backgroundColor: FLIGHT_TONES.grey.background }]}>
@@ -137,25 +132,27 @@ export default function FlightCard({ flight, flightNumber, pickupAt, onRefresh, 
   return (
     <View style={styles.card}>
       <View style={styles.head}>
-        <Text style={styles.title} numberOfLines={1}>
-          {spacedNumber(flight.number || flightNumber)}
-          {flight.airline ? <Text style={styles.airline}> · {flight.airline}</Text> : null}
-        </Text>
+        <Text style={styles.label}>FLIGHT</Text>
         <View style={[styles.badge, { backgroundColor: tone.background }]}>
+          {inAir ? <PulseDot color={tone.color} /> : null}
           <Text style={[styles.badgeText, { color: tone.color }]}>{badge.label}</Text>
         </View>
       </View>
+      <Text style={styles.title} numberOfLines={1}>
+        {spacedNumber(flight.number || flightNumber)}
+        {flight.airline ? <Text style={styles.airline}> · {flight.airline}</Text> : null}
+      </Text>
 
       <View style={styles.lineRow}>
         <Text style={styles.code}>{flight.from || '···'}</Text>
         <View style={styles.trackWrap}>
           <View style={styles.track}>
-            <View style={[styles.trackDone, { width: `${progress * 100}%`, backgroundColor: tone.color }]} />
+            <View style={[styles.trackDone, { width: `${progress * 100}%` }]} />
             <Animated.View
               style={[styles.plane, { left: `${progress * 100}%`, transform: [{ translateX: shift }] }]}
               accessibilityLabel={`Flight progress ${Math.round(progress * 100)} percent`}
             >
-              <Text style={[styles.planeText, { color: progress > 0 ? tone.color : '#9A9AA0' }]}>{PLANE}</Text>
+              <Icon name="plane" size={20} color={progress > 0 ? C.goldHi : C.faint} />
             </Animated.View>
           </View>
         </View>
@@ -167,7 +164,7 @@ export default function FlightCard({ flight, flightNumber, pickupAt, onRefresh, 
           <Times label={departed ? 'Departed' : 'Departs'} planned={flight.scheduledDeparture} actual={flight.actualDeparture} align="left" />
           {depPlace ? <Text style={styles.small}>{depPlace}</Text> : null}
         </View>
-        {pickup ? <Text style={styles.pickup}>Pickup {pickup}</Text> : null}
+        {pickup ? <Text style={styles.pickup} numberOfLines={1}>Pickup {pickup}</Text> : null}
         <Times
           label={landed ? 'Landed' : 'Arrives'}
           planned={flight.scheduledArrival}
@@ -190,40 +187,31 @@ export default function FlightCard({ flight, flightNumber, pickupAt, onRefresh, 
 }
 
 const styles = StyleSheet.create({
-  card: { borderWidth: 1, borderColor: '#E6E6EA', borderRadius: 12, padding: 12, marginTop: 10, marginBottom: 4, backgroundColor: '#fff' },
+  card: { borderWidth: 1, borderColor: C.line, borderRadius: 22, padding: 18, backgroundColor: C.cardLo },
   head: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
-  title: { flexShrink: 1, fontSize: 15, fontWeight: '700', color: '#111' },
-  airline: { fontWeight: '500', color: '#555' },
-  badge: { borderRadius: 999, paddingHorizontal: 9, paddingVertical: 3 },
-  badgeText: { fontSize: 12, fontWeight: '700' },
-  lineRow: { flexDirection: 'row', alignItems: 'center', marginTop: 14, gap: 8 },
-  code: { fontSize: 17, fontWeight: '800', color: '#111', letterSpacing: 0.5, minWidth: 38, textAlign: 'center' },
+  label: { fontSize: 11, fontWeight: '600', letterSpacing: 2.4, color: C.muted },
+  title: { fontSize: 15, fontWeight: '600', color: C.ink, marginTop: 12 },
+  airline: { fontWeight: '400', color: C.text },
+  badge: { flexDirection: 'row', alignItems: 'center', gap: 7, height: 26, borderRadius: 13, paddingHorizontal: 11 },
+  badgeText: { fontSize: 12, fontWeight: '600' },
+  lineRow: { flexDirection: 'row', alignItems: 'center', marginTop: 12, gap: 6 },
+  code: { ...SERIF, fontSize: 34, lineHeight: 38, color: C.ink, minWidth: 62, textAlign: 'center' },
   // padding keeps the plane inside the line at 0 % and 100 %
   trackWrap: { flex: 1, paddingHorizontal: 10, height: 24, justifyContent: 'center' },
-  track: { height: 2, borderRadius: 1, backgroundColor: '#E2E2E6', justifyContent: 'center' },
-  trackDone: { position: 'absolute', left: 0, top: 0, bottom: 0, borderRadius: 1, opacity: 0.55 },
-  plane: { position: 'absolute', width: 20, height: 22, marginLeft: -10, top: -11, alignItems: 'center', justifyContent: 'center' },
-  planeText: { fontSize: 18, lineHeight: 22 },
-  timesRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginTop: 8, gap: 8 },
-  timeLabel: { fontSize: 11.5, color: '#888' },
-  timeRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 1 },
-  time: { fontSize: 14, fontWeight: '700', color: '#111' },
-  timeStruck: { fontSize: 12.5, color: '#999', textDecorationLine: 'line-through' },
-  pickup: { fontSize: 11.5, color: BRAND.goldText, fontWeight: '600', marginTop: 14 },
-  foot: { flexDirection: 'row', alignItems: 'center', marginTop: 12, gap: 10 },
-  details: { fontSize: 13, fontWeight: '600', color: '#333' },
-  small: { fontSize: 11.5, color: '#888', marginTop: 2 },
-  note: { fontSize: 12.5, color: '#777', marginTop: 8 },
-  checkBtn: {
-    borderWidth: 1,
-    borderColor: BRAND.goldLine,
-    backgroundColor: BRAND.goldSoft,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    minWidth: 92,
-    alignItems: 'center',
-  },
+  track: { height: 2, borderRadius: 1, backgroundColor: C.track, justifyContent: 'center' },
+  trackDone: { position: 'absolute', left: 0, top: 0, bottom: 0, borderRadius: 1, backgroundColor: C.gold },
+  plane: { position: 'absolute', width: 20, height: 20, marginLeft: -10, top: -9, alignItems: 'center', justifyContent: 'center' },
+  timesRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginTop: 10, gap: 8 },
+  timeLabel: { fontSize: 12, color: C.muted },
+  timeRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 2 },
+  time: { fontSize: 15, fontWeight: '600', color: C.ink, marginTop: 2 },
+  timeStruck: { fontSize: 12, color: C.faint, textDecorationLine: 'line-through', marginTop: 1 },
+  pickup: { fontSize: 12, color: C.goldText, fontWeight: '600', marginTop: 16 },
+  foot: { flexDirection: 'row', alignItems: 'center', marginTop: 14, paddingTop: 12, gap: 10, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.lineHi },
+  details: { fontSize: 13, color: '#E9E5DC' },
+  small: { fontSize: 12, color: C.muted, marginTop: 2 },
+  note: { fontSize: 12.5, lineHeight: 18, color: C.muted, marginTop: 10 },
+  checkBtn: { height: 36, borderRadius: 18, paddingHorizontal: 14, minWidth: 96, alignItems: 'center', justifyContent: 'center', backgroundColor: C.goldSoft, borderWidth: 1, borderColor: C.goldLine },
   checkBtnBusy: { opacity: 0.6 },
-  checkText: { fontSize: 13, fontWeight: '700', color: BRAND.goldText },
+  checkText: { fontSize: 13, fontWeight: '600', color: C.goldHi },
 });

@@ -26,11 +26,11 @@ export type FlightStatus = {
 export type FlightTone = 'green' | 'orange' | 'blue' | 'red' | 'grey';
 
 export const FLIGHT_TONES: Record<FlightTone, { color: string; background: string }> = {
-  green: { color: '#1E7B34', background: '#E6F4EA' },
-  orange: { color: '#B35C00', background: '#FFF1DF' },
-  blue: { color: '#1A56C4', background: '#E8F0FE' },
-  red: { color: '#C62828', background: '#FDECEA' },
-  grey: { color: '#5F6368', background: '#EDEDF0' },
+  green: { color: '#8FE0B0', background: 'rgba(111,207,151,0.14)' },
+  orange: { color: '#F2B56B', background: 'rgba(242,181,107,0.15)' },
+  blue: { color: '#9CC3FF', background: 'rgba(120,170,255,0.16)' },
+  red: { color: '#FF9A8F', background: 'rgba(255,120,105,0.13)' },
+  grey: { color: '#D8D4CB', background: 'rgba(255,255,255,0.08)' },
 };
 
 // Airline names people type instead of the code ("Delta 4020")

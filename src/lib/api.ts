@@ -235,12 +235,12 @@ export const timeLabel = (iso: string | null) =>
 export const whenLabel = (iso: string | null) => (iso ? `${dayLabel(iso)} · ${timeLabel(iso)}` : 'No date yet');
 
 export const STATUS: Record<RideStatus, { label: string; color: string; soft: string; note: string }> = {
-  requested: { label: 'Requested', color: '#8A6D1F', soft: '#FBF6E9', note: 'We are checking the schedule and will confirm shortly.' },
-  confirmed: { label: 'Confirmed', color: '#219653', soft: '#E6F4EA', note: 'Your ride is booked. We will remind you the day before.' },
-  on_the_way: { label: 'Chauffeur on the way', color: '#1A56C4', soft: '#E8F0FE', note: 'Your chauffeur is heading to the pickup.' },
-  on_board: { label: 'On board', color: '#1A56C4', soft: '#E8F0FE', note: 'Enjoy the ride.' },
-  completed: { label: 'Completed', color: '#555555', soft: '#F0F0F2', note: 'Thank you for riding with us.' },
-  cancelled: { label: 'Cancelled', color: '#B3261E', soft: '#FDECEA', note: 'This ride is not booked.' },
+  requested: { label: 'Requested', color: '#E2C98A', soft: 'rgba(200,168,95,0.16)', note: 'We are checking the schedule and will confirm shortly.' },
+  confirmed: { label: 'Confirmed', color: '#8FE0B0', soft: 'rgba(111,207,151,0.14)', note: 'Your ride is booked. We will remind you the day before.' },
+  on_the_way: { label: 'Chauffeur on the way', color: '#9CC3FF', soft: 'rgba(120,170,255,0.16)', note: 'Your chauffeur is heading to the pickup.' },
+  on_board: { label: 'On board', color: '#9CC3FF', soft: 'rgba(120,170,255,0.16)', note: 'Enjoy the ride.' },
+  completed: { label: 'Completed', color: '#D8D4CB', soft: 'rgba(255,255,255,0.08)', note: 'Thank you for riding with us.' },
+  cancelled: { label: 'Cancelled', color: '#FF9A8F', soft: 'rgba(255,120,105,0.13)', note: 'This ride is not booked.' },
 };
 
 export const isUpcoming = (r: Ride, now = Date.now()) =>

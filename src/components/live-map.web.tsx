@@ -15,8 +15,8 @@ export default function LiveMap({ lat, lng, label }: Props) {
 }
 
 const styles = StyleSheet.create({
-  frame: { height: 210, borderRadius: 12, marginTop: 10, backgroundColor: '#E4ECE4', alignItems: 'center', justifyContent: 'center' },
+  frame: { height: 220, borderRadius: 16, backgroundColor: '#1B1F24', alignItems: 'center', justifyContent: 'center' },
   halo: { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(200,168,95,0.35)', alignItems: 'center', justifyContent: 'center' },
-  dot: { width: 18, height: 18, borderRadius: 9, backgroundColor: '#080808', borderWidth: 3, borderColor: '#C8A85F' },
-  text: { fontSize: 12, color: '#555', marginTop: 8 },
+  dot: { width: 18, height: 18, borderRadius: 9, backgroundColor: '#0B0B0C', borderWidth: 3, borderColor: '#E2C98A' },
+  text: { fontSize: 12, color: '#A9A397', marginTop: 8 },
 });

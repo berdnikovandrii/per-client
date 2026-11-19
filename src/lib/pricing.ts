@@ -61,6 +61,9 @@ const ZONES: { price: number; name: string; re: RegExp }[] = [
   { price: 80, name: 'Old Town / Mission Valley / Hillcrest', re: /\bold town\b|\bmission valley\b|\bhillcrest\b|\bnorth park\b|\bsouth park\b|\bmission hills\b|\bbankers hill\b|\buniversity heights\b|\bgolden hill\b|\b9210[348]\b|\b92110\b/ },
   { price: 90, name: 'Clairemont / Linda Vista / Kearny Mesa', re: /\bclairemont\b|\bbay park\b|\blinda vista\b|\bkearny mesa\b|\bserra mesa\b|\b92111\b|\b92117\b|\b92123\b/ },
   { price: 90, name: 'City Heights / College Area', re: /\bcity heights\b|\bkensington\b|\bnormal heights\b|\bcollege area\b|\bsdsu\b|\bsan diego state\b|\bdel cerro\b|\ballied gardens\b|\bsan carlos\b|\b92105\b|\b9211[569]\b|\b92120\b/ },
+  // Andrii, 2026-11-18: the last San Diego ZIPs that had no price
+  { price: 80, name: 'Southeast San Diego (Logan Heights / Encanto / Paradise Hills)', re: /\blogan heights\b|\bbarrio logan\b|\bencanto\b|\bparadise hills\b|\b9211[34]\b|\b92139\b/ },
+  { price: 95, name: 'Tierrasanta / Miramar', re: /\btierrasanta\b|\bmcas miramar\b|\b92124\b|\b92145\b/ },
   { price: 90, name: 'La Jolla / UTC', re: /\bla jolla\b|\butc\b|\buniversity city\b|\btorrey pines\b|\bbird rock\b|\b9203[78]\b|\b92122\b|\b92121\b/ },
   { price: 95, name: 'Del Mar', re: /\bdel mar\b|\bcarmel valley\b|\btorrey hills\b|\b92014\b|\b92130\b/ },
   { price: 110, name: 'Mira Mesa / Scripps Ranch', re: /\bmira mesa\b|\bsorrento valley\b|\bsorrento mesa\b|\bscripps ranch\b|\b92126\b|\b92131\b/ },
@@ -73,10 +76,12 @@ const ZONES: { price: number; name: string; re: RegExp }[] = [
   { price: 75, name: 'National City / Chula Vista', re: /\bnational city\b|\bchula vista\b|\bbonita\b|\b9191[01]\b|\b91950\b|\b91902\b/ },
   { price: 95, name: 'Imperial Beach / San Ysidro / Otay Mesa', re: /\bimperial beach\b|\bsan ysidro\b|\botay mesa\b|\bnestor\b|\b91932\b|\b92173\b|\b92154\b/ },
   { price: 115, name: 'Carlsbad / Encinitas', re: /\bcarlsbad\b|\bencinitas\b|\bsolana beach\b|\bcardiff\b|\bleucadia\b|\b9200[78]\b|\b92009\b|\b9201[01]\b|\b92024\b|\b92075\b/ },
+  // Rancho Santa Fe / Fairbanks Ranch: $120 (Andrii, 2026-11-16; on the website since 11-17)
+  { price: 120, name: 'Rancho Santa Fe', re: /\brancho santa fe\b|\bfairbanks ranch\b|\b92067\b|\b92091\b/ },
   { price: 120, name: 'Escondido', re: /\bescondido\b|\b9202[5679]\b/ },
   { price: 135, name: "Valley Center / Pauma (Harrah's)", re: /\bvalley center\b|\bpauma\b|\bharrah'?s\b|\b92082\b|\b92061\b/ },
-  { price: 130, name: 'Oceanside / Vista / San Marcos', re: /\boceanside\b|\bvista\b|\bsan marcos\b|\b9205[478]\b|\b92069\b|\b9208[134]\b/ },
-  { price: 150, name: 'Ramona / Fallbrook', re: /\bramona\b|\bfallbrook\b|\b92065\b|\b92028\b/ },
+  { price: 130, name: 'Oceanside / Vista / San Marcos', re: /\boceanside\b|\bvista\b|\bsan marcos\b|\b9205[4678]\b|\b92069\b|\b92078\b|\b9208[134]\b/ },
+  { price: 150, name: 'Ramona / Fallbrook / Bonsall / Pala', re: /\bramona\b|\bfallbrook\b|\bbonsall\b|\bpala\b|\b92065\b|\b92028\b|\b92003\b|\b92059\b/ },
   { price: 195, name: 'Temecula / Murrieta', re: /\btemecula\b|\bmurrieta\b|\bwildomar\b|\b9259[01234]\b|\b9256[23]\b/ },
   { price: 350, name: 'Riverside / Corona', re: /\briverside\b|\bcorona\b|\b925[0-9]{2}\b|\b9287[89]\b|\b9288[01]\b/ },
 ];

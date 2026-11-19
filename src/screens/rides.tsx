@@ -1,55 +1,74 @@
-// My rides: what is coming up, then what is behind.
-import { RefreshControl, SectionList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+// My rides: what is coming up, and what is behind — one switch between the two.
+import { useState } from 'react';
+import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import RideCard from '../components/ride-card';
+import { GoldButton, Medal, Rise, Segment, T, Tap } from '../components/ui';
 import { isUpcoming, type Ride } from '../lib/api';
-import { C } from '../theme';
+import { C, TAB_SPACE } from '../theme';
 
 type Props = { rides: Ride[]; refreshing: boolean; onRefresh: () => void; onOpen: (r: Ride) => void; onBook: () => void; /** not signed in: offer to */ onSignIn?: () => void };
 
+const VIEWS = ['Upcoming', 'Past'] as const;
+
 export default function RidesScreen({ rides, refreshing, onRefresh, onOpen, onBook, onSignIn }: Props) {
+  const insets = useSafeAreaInsets();
   const t = (r: Ride) => new Date(r.ride_datetime || r.created_at).getTime();
   const upcoming = rides.filter((r) => isUpcoming(r)).sort((a, b) => t(a) - t(b));
   const past = rides.filter((r) => !isUpcoming(r)).sort((a, b) => t(b) - t(a));
   const taken = rides.filter((r) => r.status === 'completed').length;
-  const sections = [
-    ...(upcoming.length ? [{ title: 'Upcoming', data: upcoming }] : []),
-    ...(past.length ? [{ title: 'Past', data: past }] : []),
-  ];
+  // nothing ahead but rides behind: open on the past ones
+  const [view, setView] = useState<(typeof VIEWS)[number] | null>(null);
+  const shown = view || (upcoming.length === 0 && past.length > 0 ? 'Past' : 'Upcoming');
+  const list = shown === 'Upcoming' ? upcoming : past;
   return (
-    <SectionList
-      sections={sections}
+    <FlatList
+      style={{ backgroundColor: C.bg }}
+      data={list}
+      extraData={shown}
       keyExtractor={(r) => String(r.id)}
-      renderItem={({ item }) => <RideCard ride={item} onPress={() => onOpen(item)} />}
-      renderSectionHeader={({ section }) => <Text style={styles.section}>{section.title}</Text>}
-      contentContainerStyle={styles.list}
-      stickySectionHeadersEnabled={false}
+      renderItem={({ item, index }) => (
+        <Rise key={`${shown}:${item.id}`} delay={Math.min(index, 5) * 70}>
+          <RideCard ride={item} lead={shown === 'Upcoming' && index === 0} onPress={() => onOpen(item)} />
+        </Rise>
+      )}
+      contentContainerStyle={{ paddingTop: insets.top + 14, paddingHorizontal: 20, paddingBottom: TAB_SPACE + insets.bottom, flexGrow: 1 }}
+      showsVerticalScrollIndicator={false}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.gold} />}
       ListHeaderComponent={
-        <View>
-          <Text style={styles.title}>My rides</Text>
-          {taken > 0 ? <Text style={styles.count}>{taken} {taken === 1 ? 'ride' : 'rides'} with us{rides.some((r) => r.pay_url || (r.can_pay && !r.paid)) ? ' · payment due on one' : ''}</Text> : null}
+        <View style={{ marginBottom: 16 }}>
+          <Text style={T.title} accessibilityRole="header">My rides</Text>
+          {taken > 0 ? (
+            <Text style={styles.count}>
+              {taken} {taken === 1 ? 'ride' : 'rides'} with us{rides.some((r) => r.pay_url || (r.can_pay && !r.paid)) ? ' · payment due on one' : ''}
+            </Text>
+          ) : null}
+          {rides.length > 0 ? <Segment items={VIEWS} value={shown} onChange={setView} style={{ marginTop: 16 }} /> : null}
         </View>
       }
       ListEmptyComponent={
-        onSignIn ? (
-          <View style={styles.empty}>
+        rides.length > 0 ? (
+          <View style={styles.none}>
+            <Text style={styles.noneText}>{shown === 'Upcoming' ? 'Nothing booked ahead.' : 'No past rides yet.'}</Text>
+            {shown === 'Upcoming' ? <GoldButton label="Book a ride" arrow onPress={onBook} style={{ alignSelf: 'stretch', marginTop: 20 }} /> : null}
+          </View>
+        ) : onSignIn ? (
+          <Rise style={styles.empty}>
+            <Medal icon="calendar" />
             <Text style={styles.emptyTitle}>Your rides live here</Text>
             <Text style={styles.emptyText}>Sign in with your email to see your bookings, your chauffeur and the car, receipts and flight status. Rides you booked with us before show up too.</Text>
-            <TouchableOpacity style={styles.button} onPress={onSignIn}>
-              <Text style={styles.buttonText}>Sign in</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.second} onPress={onBook}>
+            <GoldButton label="Sign in" onPress={onSignIn} style={{ alignSelf: 'stretch', marginTop: 26 }} />
+            <Tap style={styles.second} onPress={onBook} accessibilityRole="button">
               <Text style={styles.secondText}>Book a ride first</Text>
-            </TouchableOpacity>
-          </View>
+            </Tap>
+          </Rise>
         ) : (
-          <View style={styles.empty}>
+          <Rise style={styles.empty}>
+            <Medal icon="car" />
             <Text style={styles.emptyTitle}>No rides yet</Text>
             <Text style={styles.emptyText}>Book your first ride and it will show up here with its status, your chauffeur and the car.</Text>
-            <TouchableOpacity style={styles.button} onPress={onBook}>
-              <Text style={styles.buttonText}>Book a ride</Text>
-            </TouchableOpacity>
-          </View>
+            <GoldButton label="Book a ride" arrow onPress={onBook} style={{ alignSelf: 'stretch', marginTop: 26 }} />
+          </Rise>
         )
       }
     />
@@ -57,15 +76,12 @@ export default function RidesScreen({ rides, refreshing, onRefresh, onOpen, onBo
 }
 
 const styles = StyleSheet.create({
-  list: { padding: 16, paddingBottom: 32 },
-  title: { fontSize: 30, fontWeight: '800', color: C.ink, marginBottom: 6 },
-  count: { fontSize: 14, color: C.muted, marginBottom: 4 },
-  section: { fontSize: 12, fontWeight: '700', color: C.muted, textTransform: 'uppercase', letterSpacing: 0.8, marginTop: 14, marginBottom: 8, marginLeft: 4 },
-  empty: { alignItems: 'center', paddingVertical: 60, paddingHorizontal: 20 },
-  emptyTitle: { fontSize: 20, fontWeight: '800', color: C.ink },
-  emptyText: { fontSize: 15, color: C.muted, textAlign: 'center', lineHeight: 22, marginTop: 8 },
-  button: { backgroundColor: C.black, borderRadius: 12, paddingHorizontal: 22, paddingVertical: 14, marginTop: 18 },
-  buttonText: { color: C.gold, fontWeight: '800', fontSize: 16 },
-  second: { paddingVertical: 14 },
-  secondText: { color: C.goldText, fontWeight: '700', fontSize: 15 },
+  count: { fontSize: 14, color: C.muted, marginTop: 4 },
+  none: { alignItems: 'center', paddingTop: 36, paddingHorizontal: 8 },
+  noneText: { ...T.body, color: C.muted },
+  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8, paddingBottom: 40 },
+  emptyTitle: { ...T.h2, fontSize: 30, lineHeight: 34, marginTop: 20, textAlign: 'center' },
+  emptyText: { ...T.body, color: C.muted, textAlign: 'center', marginTop: 10 },
+  second: { height: 48, justifyContent: 'center', marginTop: 6 },
+  secondText: { color: C.goldText, fontWeight: '600', fontSize: 15 },
 });

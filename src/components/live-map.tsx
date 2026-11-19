@@ -29,6 +29,7 @@ export default function LiveMap({ lat, lng, label }: Props) {
         pitchEnabled={false}
         rotateEnabled={false}
         toolbarEnabled={false}
+        userInterfaceStyle="dark"
       >
         <Marker coordinate={{ latitude: lat, longitude: lng }} title={label || 'Your chauffeur'} anchor={{ x: 0.5, y: 0.5 }}>
           <View style={styles.halo}>
@@ -41,7 +42,7 @@ export default function LiveMap({ lat, lng, label }: Props) {
 }
 
 const styles = StyleSheet.create({
-  frame: { height: 210, borderRadius: 12, overflow: 'hidden', marginTop: 10, backgroundColor: '#E9E9EE' },
+  frame: { height: 220, borderRadius: 16, overflow: 'hidden', backgroundColor: '#1B1B1D' },
   halo: { width: 34, height: 34, borderRadius: 17, backgroundColor: 'rgba(200,168,95,0.35)', alignItems: 'center', justifyContent: 'center' },
-  dot: { width: 18, height: 18, borderRadius: 9, backgroundColor: '#080808', borderWidth: 3, borderColor: '#C8A85F' },
+  dot: { width: 18, height: 18, borderRadius: 9, backgroundColor: '#0B0B0C', borderWidth: 3, borderColor: '#E2C98A' },
 });

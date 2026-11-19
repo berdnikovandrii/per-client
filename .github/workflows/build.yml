@@ -1,0 +1,51 @@
+# Ships the client app "Pacific Elite Rides" from GitHub, with no terminal and no passwords (2026-11-18).
+#
+# By hand only: GitHub → Actions → Ship → Run workflow → pick what to do.
+#   store   a new App Store build: EAS builds the iPhone app and sends it to App Store Connect (TestFlight).
+#           Needed when the version in app.json changes or a native module is added.
+#   update  an over-the-air update for the version that is already in the App Store (JavaScript and pictures only).
+#
+# One secret in Settings → Secrets and variables → Actions:
+#   EXPO_TOKEN   expo.dev → Access tokens
+# Everything else lives on expo.dev: the Apple certificate and the App Store Connect key (Credentials), and the
+# app's own values (Environment variables → production): EXPO_PUBLIC_SUPABASE_URL, EXPO_PUBLIC_SUPABASE_ANON_KEY,
+# EXPO_PUBLIC_GOOGLE_PLACES_API_KEY, META_APP_ID, META_CLIENT_TOKEN.
+name: Ship
+
+on:
+  workflow_dispatch:
+    inputs:
+      what:
+        description: What to do
+        type: choice
+        default: update
+        options: [update, store]
+      message:
+        description: Update message (shown in EAS; for "update" only)
+        type: string
+        default: Update from GitHub
+
+concurrency:
+  group: ship
+  cancel-in-progress: false
+
+jobs:
+  ship:
+    runs-on: ubuntu-latest
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Type check
+        run: npx tsc --noEmit
+      - name: App Store build (EAS builds, then submits to App Store Connect)
+        if: inputs.what == 'store'
+        run: npx eas-cli@latest build --platform ios --profile production --non-interactive --no-wait --auto-submit
+      - name: Over-the-air update (production channel)
+        if: inputs.what == 'update'
+        run: npx eas-cli@latest update --channel production --environment production --platform ios --message "${{ inputs.message }}" --non-interactive

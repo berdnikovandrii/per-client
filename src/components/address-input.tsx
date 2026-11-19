@@ -2,7 +2,9 @@
 // Without a Places key (web preview, or before the key allows this bundle id) it is a plain text field —
 // zone prices still work because they match on the text ("La Jolla", "92037", "SAN").
 import { useRef, useState } from 'react';
-import { ActivityIndicator, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Platform, StyleSheet, Text, TextInput, View } from 'react-native';
+import Icon from './icon';
+import { T, Tap } from './ui';
 import { C } from '../theme';
 
 const KEY = Platform.OS === 'web' ? '' : process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY || '';
@@ -18,14 +20,40 @@ export const AIRPORTS = [
   { label: 'CBX', value: 'Cross Border Xpress (CBX), 2745 Otay Pacific Dr, San Diego, CA' },
 ];
 
+type Place = { label: string; address: string };
 type Props = {
-  label: string; value: string; onChange: (text: string) => void; placeholder: string; dot?: 'black' | 'gold';
-  places?: { label: string; address: string }[];
-  /** just the field with suggestions: no route dot and no airport / saved-place buttons (the Account tab) */
+  label: string; value: string; onChange: (text: string) => void; placeholder: string;
+  places?: Place[];
+  /** the one-tap airports and saved places under an empty field (on by default) */
+  quick?: boolean;
+  /** a boxed field on its own, as on the Account tab: no one-tap buttons */
   bare?: boolean;
 };
 
-export default function AddressInput({ label, value, onChange, placeholder, dot = 'black', places = [], bare }: Props) {
+/** Where the route dot sits, measured from the top of the field. */
+export const ADDRESS_DOT_Y = 36;
+
+/** One-tap airports and saved places. */
+export function QuickPicks({ places = [], onPick }: { places?: Place[]; onPick: (address: string) => void }) {
+  return (
+    <View style={styles.quick}>
+      {places.map((pl) => (
+        <Tap key={`${pl.label}:${pl.address}`} style={[styles.chip, styles.placeChip]} feedback="select" onPress={() => onPick(pl.address)} accessibilityRole="button" accessibilityLabel={`Use ${pl.label}`}>
+          <Icon name={/home/i.test(pl.label) ? 'home' : /office|work/i.test(pl.label) ? 'briefcase' : 'pin'} size={14} color={C.text} />
+          <Text style={[styles.chipText, { color: C.ink }]}>{pl.label}</Text>
+        </Tap>
+      ))}
+      {AIRPORTS.map((a) => (
+        <Tap key={a.label} style={styles.chip} feedback="select" onPress={() => onPick(a.value)} accessibilityRole="button" accessibilityLabel={`Use ${a.label}`}>
+          <Icon name="plane" size={13} color={C.goldHi} />
+          <Text style={styles.chipText}>{a.label}</Text>
+        </Tap>
+      ))}
+    </View>
+  );
+}
+
+export default function AddressInput({ label, value, onChange, placeholder, places = [], quick = true, bare }: Props) {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [focused, setFocused] = useState(false);
@@ -67,14 +95,13 @@ export default function AddressInput({ label, value, onChange, placeholder, dot 
   };
 
   return (
-    <View style={[styles.wrap, bare && { paddingVertical: 0 }]}>
-      <View style={styles.row}>
-        {bare ? null : <View style={[styles.dot, dot === 'gold' && { backgroundColor: C.gold }]} />}
-        <View style={{ flex: 1 }}>
-          <Text style={styles.label}>{label}</Text>
+    <View style={bare ? { gap: 8 } : styles.wrap}>
+      <Text style={[T.fieldLabel, { lineHeight: 14 }]}>{label}</Text>
+      <View style={[styles.row, bare ? styles.box : styles.under, focused && { borderColor: C.gold }]}>
+        <View style={{ flex: 1, justifyContent: 'center' }}>
           {/* our own placeholder: the native one came out letter-spaced on iPhone after the field was cleared */}
           {!value ? (
-            <View style={styles.placeholderBox} pointerEvents="none">
+            <View style={StyleSheet.absoluteFill} pointerEvents="none">
               <Text style={styles.placeholder} numberOfLines={1}>{placeholder}</Text>
             </View>
           ) : null}
@@ -85,40 +112,30 @@ export default function AddressInput({ label, value, onChange, placeholder, dot 
             accessibilityLabel={`${label}: ${placeholder}`}
             autoCorrect={false}
             spellCheck={false}
+            keyboardAppearance="dark"
+            selectionColor={C.gold}
             onFocus={() => setFocused(true)}
             onBlur={() => setTimeout(() => setFocused(false), 200)}
             returnKeyType="done"
           />
         </View>
         {loading ? <ActivityIndicator color={C.gold} /> : value ? (
-          <TouchableOpacity onPress={() => pick('')} hitSlop={10} accessibilityLabel={`Clear ${label}`}>
-            <Text style={styles.clear}>×</Text>
-          </TouchableOpacity>
+          <Tap onPress={() => pick('')} hitSlop={10} style={styles.clear} feedback={null} accessibilityRole="button" accessibilityLabel={`Clear ${label}`}>
+            <Icon name="close" size={12} color={C.text} stroke={2} />
+          </Tap>
         ) : null}
       </View>
-      {!value.trim() && !bare && (
-        <View style={styles.quick}>
-          {places.map((pl) => (
-            <TouchableOpacity key={`${pl.label}:${pl.address}`} style={[styles.quickChip, styles.placeChip]} onPress={() => pick(pl.address)}>
-              <Text style={[styles.quickText, { color: C.ink }]}>{pl.label}</Text>
-            </TouchableOpacity>
-          ))}
-          {AIRPORTS.map((a) => (
-            <TouchableOpacity key={a.label} style={styles.quickChip} onPress={() => pick(a.value)}>
-              <Text style={styles.quickText}>✈ {a.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
+      {!value.trim() && !bare && quick ? <QuickPicks places={places} onPick={pick} /> : null}
       {focused && down && suggestions.length === 0 && value.trim().length >= 3 ? (
-        <Text style={[styles.down, bare && { marginLeft: 0 }]}>Suggestions are not available right now. Please type the full address.</Text>
+        <Text style={styles.down}>Suggestions are not available right now. Please type the full address.</Text>
       ) : null}
       {focused && suggestions.length > 0 && (
-        <View style={[styles.list, bare && { marginLeft: 0 }]}>
-          {suggestions.map((s) => (
-            <TouchableOpacity key={s} style={styles.item} onPress={() => pick(s)}>
+        <View style={styles.list}>
+          {suggestions.map((s, i) => (
+            <Tap key={s} style={[styles.item, i > 0 && styles.itemLine]} to={0.99} feedback="select" onPress={() => pick(s)} accessibilityRole="button">
+              <Icon name="pin" size={16} color={C.goldText} />
               <Text style={styles.itemText} numberOfLines={2}>{s}</Text>
-            </TouchableOpacity>
+            </Tap>
           ))}
         </View>
       )}
@@ -127,20 +144,20 @@ export default function AddressInput({ label, value, onChange, placeholder, dot 
 }
 
 const styles = StyleSheet.create({
-  wrap: { paddingVertical: 10 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: C.ink, marginTop: 14 },
-  label: { fontSize: 11.5, fontWeight: '700', color: C.muted, textTransform: 'uppercase', letterSpacing: 0.6 },
-  input: { fontSize: 17, color: C.ink, paddingVertical: 6, fontWeight: '600' },
-  placeholderBox: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 34, justifyContent: 'center' },
-  placeholder: { fontSize: 17, color: '#A1A1A6', fontWeight: '500' },
-  down: { marginLeft: 22, marginTop: 4, fontSize: 12.5, color: C.muted, lineHeight: 17 },
-  clear: { fontSize: 24, color: '#A1A1A6', paddingHorizontal: 4 },
-  quick: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginLeft: 22, marginTop: 4 },
-  placeChip: { backgroundColor: '#F0F0F2', borderColor: '#E0E0E5' },
-  quickChip: { backgroundColor: C.goldSoft, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: '#E8D9A8' },
-  quickText: { fontSize: 13, fontWeight: '700', color: C.goldText },
-  list: { marginLeft: 22, marginTop: 6, backgroundColor: '#fff', borderRadius: 12, borderWidth: 1, borderColor: C.line, overflow: 'hidden' },
-  item: { paddingHorizontal: 12, paddingVertical: 11, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.line },
-  itemText: { fontSize: 15, color: C.ink },
+  wrap: { paddingTop: 2, paddingBottom: 10 },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  under: { height: 40, borderBottomWidth: 1, borderBottomColor: C.line },
+  box: { height: 54, paddingHorizontal: 16, borderRadius: 16, backgroundColor: C.card, borderWidth: 1, borderColor: C.line },
+  input: { fontSize: 16, color: C.ink, paddingVertical: 0, height: 38 },
+  placeholder: { fontSize: 16, lineHeight: 38, color: C.faint },
+  down: { marginTop: 6, fontSize: 12.5, color: C.muted, lineHeight: 17 },
+  clear: { width: 22, height: 22, borderRadius: 11, backgroundColor: C.raised, alignItems: 'center', justifyContent: 'center' },
+  quick: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 },
+  chip: { height: 34, flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 17, paddingHorizontal: 12, backgroundColor: C.goldSoft, borderWidth: 1, borderColor: C.goldLine },
+  placeChip: { backgroundColor: C.raised, borderColor: C.line },
+  chipText: { fontSize: 13, fontWeight: '600', color: C.goldHi },
+  list: { marginTop: 8, backgroundColor: C.raised, borderRadius: 14, borderWidth: 1, borderColor: C.lineHi, overflow: 'hidden' },
+  item: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 12 },
+  itemLine: { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.lineHi },
+  itemText: { flex: 1, fontSize: 15, lineHeight: 20, color: C.ink },
 });

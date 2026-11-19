@@ -4,9 +4,11 @@
 // Sign in with an email code, book a ride with the price up front, follow it (status, chauffeur, car, flight),
 // pay the Square invoice, get a push when it is confirmed or the chauffeur is on the way. Same database as
 // PER CRM and PER Driver, reached only through the client_* functions (supabase/client_app.sql in the CRM repo).
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, Image, Modal, Platform, StyleSheet, Text, TouchableOpacity, View, type ImageSourcePropType } from 'react-native';
-import { SafeAreaProvider, SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { ActivityIndicator, Animated, AppState, Modal, Platform, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { BlurView } from 'expo-blur';
+import { CormorantGaramond_600SemiBold, useFonts } from '@expo-google-fonts/cormorant-garamond';
 import { StatusBar } from 'expo-status-bar';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
@@ -19,6 +21,8 @@ import RidesScreen from './src/screens/rides';
 import RideScreen from './src/screens/ride';
 import BookScreen, { type Prefill } from './src/screens/book';
 import AccountScreen, { GuestAccount } from './src/screens/account';
+import Icon, { type IconName } from './src/components/icon';
+import { GoldButton, Medal, NATIVE, reduceMotion, T, Tap } from './src/components/ui';
 import { C } from './src/theme';
 
 Notifications.setNotificationHandler({
@@ -26,11 +30,20 @@ Notifications.setNotificationHandler({
 });
 
 type Tab = 'home' | 'rides' | 'account';
-const TABS: { key: Tab; label: string; icon: ImageSourcePropType; iconOn: ImageSourcePropType }[] = [
-  { key: 'home', label: 'Book', icon: require('./assets/tab-car-sport-outline.png'), iconOn: require('./assets/tab-car-sport.png') },
-  { key: 'rides', label: 'My rides', icon: require('./assets/tab-calendar-outline.png'), iconOn: require('./assets/tab-calendar.png') },
-  { key: 'account', label: 'Account', icon: require('./assets/tab-person-circle-outline.png'), iconOn: require('./assets/tab-person-circle.png') },
+const TABS: { key: Tab; label: string; icon: IconName }[] = [
+  { key: 'home', label: 'Book', icon: 'car' },
+  { key: 'rides', label: 'My rides', icon: 'calendar' },
+  { key: 'account', label: 'Account', icon: 'user' },
 ];
+
+/** A tab's screen fades in when it is chosen. */
+function Fade({ children }: { children: ReactNode }) {
+  const v = useRef(new Animated.Value(reduceMotion() ? 1 : 0)).current;
+  useEffect(() => {
+    Animated.timing(v, { toValue: 1, duration: 220, useNativeDriver: NATIVE }).start();
+  }, [v]);
+  return <Animated.View style={{ flex: 1, opacity: v }}>{children}</Animated.View>;
+}
 
 /** Nobody is signed in: the app still works, with empty lists and a sign-in step when a request is sent. */
 const GUEST: Me = { id: 0, email: '', name: null, phone: null, places: [], ref_code: null, referrals: 0, referral_offer: null, demo: false };
@@ -140,14 +153,13 @@ function Main({ session }: { session: Session | null }) {
   if (me === null) {
     return (
       <View style={[styles.center, { padding: 28 }]}>
+        <Medal icon="info" />
         <Text style={styles.lostTitle}>We could not load your account</Text>
         <Text style={styles.lostText}>Check your connection and try again, or sign in once more.</Text>
-        <TouchableOpacity style={styles.retry} onPress={reloadMe}>
-          <Text style={styles.retryText}>Try again</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={{ marginTop: 16 }} onPress={() => supabase.auth.signOut()}>
-          <Text style={{ color: C.muted, fontWeight: '600' }}>Sign out</Text>
-        </TouchableOpacity>
+        <GoldButton label="Try again" onPress={reloadMe} style={{ alignSelf: 'stretch', marginTop: 26 }} />
+        <Tap style={{ marginTop: 8, height: 44, justifyContent: 'center' }} onPress={() => supabase.auth.signOut()} accessibilityRole="button">
+          <Text style={{ color: C.goldText, fontWeight: '600', fontSize: 15 }}>Sign out</Text>
+        </Tap>
       </View>
     );
   }
@@ -156,16 +168,21 @@ function Main({ session }: { session: Session | null }) {
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
-      {tab === 'home' && <HomeScreen me={me} rides={rides} refreshing={refreshing} onRefresh={refresh} onBook={(p) => setBooking(p || {})} onOpen={setOpen} />}
-      {tab === 'rides' && <RidesScreen rides={rides} refreshing={refreshing} onRefresh={refresh} onOpen={setOpen} onBook={() => setBooking({})} onSignIn={userId ? undefined : () => setSignIn(true)} />}
-      {tab === 'account' && (userId && me.id ? <AccountScreen key={me.id} me={me} onSaved={reloadMe} /> : <GuestAccount onSignIn={() => setSignIn(true)} />)}
-      <View style={[styles.tabs, { paddingBottom: Math.max(insets.bottom, 6) }]}>
+      <Fade key={tab}>
+        {tab === 'home' && <HomeScreen me={me} rides={rides} refreshing={refreshing} onRefresh={refresh} onBook={(p) => setBooking(p || {})} onOpen={setOpen} />}
+        {tab === 'rides' && <RidesScreen rides={rides} refreshing={refreshing} onRefresh={refresh} onOpen={setOpen} onBook={() => setBooking({})} onSignIn={userId ? undefined : () => setSignIn(true)} />}
+        {tab === 'account' && (userId && me.id ? <AccountScreen key={me.id} me={me} onSaved={reloadMe} /> : <GuestAccount onSignIn={() => setSignIn(true)} />)}
+      </Fade>
+      {/* the tab bar floats over the content: a glass pill */}
+      <View style={[styles.tabs, { bottom: Math.max(insets.bottom - 8, 14) }]} accessibilityRole="tablist">
+        <BlurView intensity={40} tint="dark" style={StyleSheet.absoluteFill} />
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: C.bar }]} />
         {TABS.map((t) => {
           const on = tab === t.key;
           return (
-            <TouchableOpacity key={t.key} style={styles.tab} onPress={() => setTab(t.key)} accessibilityRole="tab" accessibilityState={{ selected: on }}>
+            <Tap key={t.key} style={styles.tab} to={0.9} feedback={on ? null : 'select'} onPress={() => setTab(t.key)} accessibilityRole="tab" accessibilityLabel={t.key === 'rides' && upcoming > 0 ? `${t.label}, ${upcoming} upcoming` : t.label} accessibilityState={{ selected: on }}>
               <View>
-                <Image source={on ? t.iconOn : t.icon} style={[styles.tabIcon, { tintColor: on ? C.ink : '#8E8E93' }]} />
+                <Icon name={t.icon} color={on ? C.goldHi : C.muted} />
                 {t.key === 'rides' && upcoming > 0 ? (
                   <View style={styles.tabBadge}>
                     <Text style={styles.tabBadgeText}>{upcoming}</Text>
@@ -173,7 +190,7 @@ function Main({ session }: { session: Session | null }) {
                 ) : null}
               </View>
               <Text style={[styles.tabText, on && styles.tabTextOn]}>{t.label}</Text>
-            </TouchableOpacity>
+            </Tap>
           );
         })}
       </View>
@@ -223,39 +240,39 @@ function Main({ session }: { session: Session | null }) {
 
 export default function App() {
   const [session, setSession] = useState<Session | null | undefined>(undefined);
+  // the heading font ships inside the app; if it ever fails to load, headings fall back to the system font
+  const [fontsReady, fontsError] = useFonts({ CormorantGaramond_600SemiBold });
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
     const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
     return () => sub.subscription.unsubscribe();
   }, []);
+  const ready = session !== undefined && (fontsReady || !!fontsError);
   return (
     <SafeAreaProvider>
-      <StatusBar style={session === undefined ? 'light' : 'dark'} />
-      {/* the bottom inset belongs to the tab bar, so its white runs to the edge of the screen */}
-      <SafeAreaView style={{ flex: 1, backgroundColor: session === undefined ? C.black : C.bg }} edges={['top']}>
-        {session === undefined ? (
-          <View style={[styles.center, { backgroundColor: C.black }]}>
+      <StatusBar style="light" />
+      {/* each screen keeps clear of the status bar itself: the home photo runs under it */}
+      <View style={{ flex: 1, backgroundColor: C.bg }}>
+        {ready ? (
+          <Main session={session!} />
+        ) : (
+          <View style={styles.center}>
             <ActivityIndicator color={C.gold} />
           </View>
-        ) : (
-          <Main session={session} />
         )}
-      </SafeAreaView>
+      </View>
     </SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: C.bg },
-  tabs: { flexDirection: 'row', backgroundColor: C.card, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.line },
-  tab: { flex: 1, alignItems: 'center', paddingTop: 8, paddingBottom: 2 },
-  tabIcon: { width: 26, height: 26 },
-  tabText: { fontSize: 11.5, fontWeight: '600', color: '#8E8E93', marginTop: 3 },
-  tabTextOn: { color: C.ink, fontWeight: '800' },
-  tabBadge: { position: 'absolute', top: -4, right: -10, minWidth: 17, height: 17, borderRadius: 9, backgroundColor: C.gold, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 4 },
-  tabBadgeText: { fontSize: 10.5, fontWeight: '800', color: C.black },
-  lostTitle: { fontSize: 20, fontWeight: '800', color: C.ink, textAlign: 'center' },
-  lostText: { fontSize: 15, color: C.muted, textAlign: 'center', marginTop: 10, lineHeight: 22 },
-  retry: { marginTop: 24, backgroundColor: C.black, borderRadius: 12, paddingHorizontal: 22, paddingVertical: 13 },
-  retryText: { color: C.gold, fontWeight: '800', fontSize: 15 },
+  tabs: { position: 'absolute', left: 24, right: 24, height: 64, borderRadius: 32, overflow: 'hidden', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', borderWidth: 1, borderColor: C.lineHi },
+  tab: { minWidth: 88, height: 52, alignItems: 'center', justifyContent: 'center', gap: 3 },
+  tabText: { fontSize: 11, fontWeight: '500', color: C.muted },
+  tabTextOn: { color: C.goldHi, fontWeight: '600' },
+  tabBadge: { position: 'absolute', top: -5, right: -14, minWidth: 18, height: 18, borderRadius: 9, backgroundColor: C.goldHi, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5 },
+  tabBadgeText: { fontSize: 11, fontWeight: '700', color: C.onGold },
+  lostTitle: { ...T.h2, textAlign: 'center', marginTop: 18 },
+  lostText: { ...T.body, color: C.muted, textAlign: 'center', marginTop: 10 },
 });

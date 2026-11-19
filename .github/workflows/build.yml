@@ -3,6 +3,7 @@
 # By hand only: GitHub → Actions → Ship → Run workflow → pick what to do.
 #   store   a new App Store build: EAS builds the iPhone app and sends it to App Store Connect (TestFlight).
 #           Needed when the version in app.json changes or a native module is added.
+#   submit  send the latest finished EAS build to App Store Connect (when a build was made without submitting).
 #   update  an over-the-air update for the version that is already in the App Store (JavaScript and pictures only).
 #
 # One secret in Settings → Secrets and variables → Actions:
@@ -19,7 +20,7 @@ on:
         description: What to do
         type: choice
         default: update
-        options: [update, store]
+        options: [update, store, submit]
       message:
         description: Update message (shown in EAS; for "update" only)
         type: string
@@ -46,6 +47,9 @@ jobs:
       - name: App Store build (EAS builds, then submits to App Store Connect)
         if: inputs.what == 'store'
         run: npx eas-cli@latest build --platform ios --profile production --non-interactive --no-wait --auto-submit
+      - name: Send the latest build to App Store Connect
+        if: inputs.what == 'submit'
+        run: npx eas-cli@latest submit --platform ios --profile production --latest --non-interactive --no-wait
       - name: Over-the-air update (production channel)
         if: inputs.what == 'update'
         run: npx eas-cli@latest update --channel production --environment production --platform ios --message "${{ inputs.message }}" --non-interactive

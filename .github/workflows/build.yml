@@ -1,6 +1,8 @@
 # Ships the client app "Pacific Elite Rides" from GitHub, with no terminal and no passwords (2026-11-18).
 #
-# By hand only: GitHub → Actions → Ship → Run workflow → pick what to do.
+# By hand: GitHub → Actions → Ship → Run workflow → pick what to do.
+# Without a browser (2026-11-21): change the line in the file .ota-update and push — that sends an over-the-air
+# update with that line as its message. Builds and App Store submissions stay by hand only.
 #   store   a new App Store build: EAS builds the iPhone app and sends it to App Store Connect (TestFlight).
 #           Needed when the version in app.json changes or a native module is added.
 #   submit  send the latest finished EAS build to App Store Connect (when a build was made without submitting).
@@ -14,6 +16,9 @@
 name: Ship
 
 on:
+  push:
+    branches: [main]
+    paths: ['.ota-update']
   workflow_dispatch:
     inputs:
       what:
@@ -51,5 +56,11 @@ jobs:
         if: inputs.what == 'submit'
         run: npx eas-cli@latest submit --platform ios --profile production --latest --non-interactive --no-wait
       - name: Over-the-air update (production channel)
-        if: inputs.what == 'update'
-        run: npx eas-cli@latest update --channel production --environment production --platform ios --message "${{ inputs.message }}" --non-interactive
+        if: github.event_name == 'push' || inputs.what == 'update'
+        env:
+          TYPED: ${{ inputs.message }}
+        run: |
+          MSG="$TYPED"
+          [ "${{ github.event_name }}" = "push" ] && MSG="$(head -n 1 .ota-update)"
+          [ -z "$MSG" ] && MSG="Update from GitHub"
+          npx eas-cli@latest update --channel production --environment production --platform ios --message "$MSG" --non-interactive

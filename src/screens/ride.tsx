@@ -30,6 +30,9 @@ const hoursLabel = (h: number) => `${h} hour${h === 1 ? '' : 's'}`;
 /** What one car of a multi-car booking is doing right now. */
 const STAGE_NOTE: Record<string, string> = { on_my_way: 'On the way', picked_up: 'On board', done: 'Finished' };
 const BRANDS: Record<string, string> = { VISA: 'Visa', MASTERCARD: 'Mastercard', AMERICAN_EXPRESS: 'Amex', DISCOVER: 'Discover' };
+/** Whole minutes from now until the car gets there (negative once that time has passed). */
+const etaLeft = (iso: string, now: number) => Math.round((new Date(iso).getTime() - now) / 60_000);
+const clock = (iso: string) => new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 const brandName = (b: string | null) => (b ? BRANDS[b] || b.replace(/_/g, ' ') : 'Card');
 
 export default function RideScreen({ ride, onClose, onChanged, onBookAgain }: Props) {
@@ -56,6 +59,9 @@ export default function RideScreen({ ride, onClose, onChanged, onBookAgain }: Pr
   const rc = receipt(ride);
   const moving = ride.status === 'on_the_way' || ride.status === 'on_board';
   const car = moving ? ride.location : null;
+  // the arrival time counts only for the leg the ride is on, and not long after it has passed
+  const etaLeg = ride.status === 'on_board' ? 'dropoff' : 'pickup';
+  const eta = car && ride.eta && ride.eta.to === etaLeg && ride.eta.at ? ride.eta : null;
 
   // while the ride is under way: a fresh position every 12 s, and "updated … ago" kept true in between
   const [now, setNow] = useState(() => Date.now());
@@ -176,6 +182,16 @@ export default function RideScreen({ ride, onClose, onChanged, onBookAgain }: Pr
                 <Label>{ride.status === 'on_board' ? 'Your ride, live' : 'Live location'}</Label>
                 <Pill label={agoLabel(car.at, now)} tone="green" live />
               </View>
+              {eta && etaLeft(eta.at, now) > -4 ? (
+                <View accessibilityLabel={etaLeg === 'pickup' ? 'Your chauffeur arrives' : 'You arrive'}>
+                  <Text style={styles.etaBig}>
+                    {etaLeft(eta.at, now) <= 1 ? (etaLeg === 'pickup' ? 'Arriving now' : 'Almost there') : `${etaLeft(eta.at, now)} min`}
+                  </Text>
+                  <Text style={T.small}>
+                    {etaLeg === 'pickup' ? 'Your chauffeur arrives' : 'You arrive'} about {clock(eta.at)}, with the traffic right now
+                  </Text>
+                </View>
+              ) : null}
               <LiveMap lat={car.lat} lng={car.lng} label={ride.chauffeur || undefined} />
               <GhostButton
                 label="Open in Maps"
@@ -482,6 +498,7 @@ const styles = StyleSheet.create({
   note: { fontSize: 14, lineHeight: 20, color: C.text, marginTop: 5 },
   cancelled: { borderRadius: 18, padding: 16, backgroundColor: C.redSoft, borderWidth: 1, borderColor: 'rgba(255,120,105,0.25)' },
   cancelledText: { fontSize: 14.5, lineHeight: 21, color: C.red },
+  etaBig: { fontSize: 30, lineHeight: 34, fontWeight: '600', color: C.ink, marginBottom: 2 },
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
   pair: { flexDirection: 'row', gap: 10 },
   lone: { width: 9, height: 9, borderRadius: 4.5, borderWidth: 1.5, borderColor: C.gold },

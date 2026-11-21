@@ -78,6 +78,8 @@ export type Ride = {
   stage_at: string | null;
   /** where the car is — only while the chauffeur is on the way or the rider is on board */
   location: { lat: number; lng: number; heading: number | null; at: string } | null;
+  /** when the car gets there, with live traffic: to the pickup while on the way, to the drop-off once on board */
+  eta?: { at: string; to: 'pickup' | 'dropoff' } | null;
   booked_in_app: boolean;
   created_at: string;
 };

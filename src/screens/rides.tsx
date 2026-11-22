@@ -4,7 +4,7 @@ import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import RideCard from '../components/ride-card';
 import { GoldButton, Medal, Rise, Segment, T, Tap } from '../components/ui';
-import { isUpcoming, type Ride } from '../lib/api';
+import { isUpcoming, paymentDue, type Ride } from '../lib/api';
 import { C, TAB_SPACE } from '../theme';
 
 type Props = { rides: Ride[]; refreshing: boolean; onRefresh: () => void; onOpen: (r: Ride) => void; onBook: () => void; /** not signed in: offer to */ onSignIn?: () => void };
@@ -40,7 +40,7 @@ export default function RidesScreen({ rides, refreshing, onRefresh, onOpen, onBo
           <Text style={T.title} accessibilityRole="header">My rides</Text>
           {taken > 0 ? (
             <Text style={styles.count}>
-              {taken} {taken === 1 ? 'ride' : 'rides'} with us{rides.some((r) => r.pay_url || (r.can_pay && !r.paid)) ? ' · payment due on one' : ''}
+              {taken} {taken === 1 ? 'ride' : 'rides'} with us{rides.some((r) => paymentDue(r)) ? ' · payment due on one' : ''}
             </Text>
           ) : null}
           {rides.length > 0 ? <Segment items={VIEWS} value={shown} onChange={setView} style={{ marginTop: 16 }} /> : null}

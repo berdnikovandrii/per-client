@@ -11,7 +11,7 @@ import Icon from '../components/icon';
 import { Card, Field, GoldButton, haptic, Medal, Rise, RouteRail, Segment, Stepper, T, Tap } from '../components/ui';
 import { trackBooking } from '../lib/analytics';
 import { book, money, PHONE, type Booking, type Me } from '../lib/api';
-import { estimate, INCLUDED, VEHICLES, type VehicleKey } from '../lib/estimate';
+import { estimate, INCLUDED, isAirportPlace, VEHICLES, type VehicleKey } from '../lib/estimate';
 import { CAR_PHOTO } from '../lib/photos';
 import { supabase } from '../lib/supabase';
 import Login from './login';
@@ -22,7 +22,7 @@ export type Prefill = { pickup?: string; dropoff?: string; tripType?: Booking['t
 const EXTRAS = ['Child seat', 'Name sign at arrivals', 'Extra luggage', 'Pet on board'];
 
 const TRIPS: Booking['trip_type'][] = ['One way', 'Round trip', 'Hourly'];
-const isAirport = (t: string) => /airport|\(san\)|\(lax\)|\bcbx\b/i.test(t);
+const isAirport = isAirportPlace;
 
 /** Next full half hour, at least 3 hours from now. */
 function defaultWhen() {
@@ -75,8 +75,15 @@ export default function BookScreen({ me, prefill, first, onClose, onBooked }: { 
     [pickup, dropoff, stops, tripType, shownHours, vehicle, passengers]
   );
   const seats = VEHICLES.find((v) => v.key === vehicle)!.seats;
+  // The Sprinter Party Bus does not do airport rides (Andrii, 2026-11-22): with an airport anywhere on the route
+  // it cannot be picked, and a Sprinter picked earlier goes back to the SUV
+  const airportRide = [pickup, dropoff, ...stops].some(isAirport);
+  useEffect(() => {
+    if (airportRide && vehicle === 'Sprinter') setVehicle('SUV');
+  }, [airportRide, vehicle]);
 
   function pickVehicle(key: VehicleKey) {
+    if (key === 'Sprinter' && airportRide) return;
     setVehicle(key);
     if (key === 'Sprinter') setTripType('Hourly');
   }
@@ -224,12 +231,12 @@ export default function BookScreen({ me, prefill, first, onClose, onBooked }: { 
             style={{ flex: 1 }}
             onChange={(n) => {
               setPassengers(n);
-              if (n > 6 && vehicle === 'SUV' && tripType === 'Hourly') setVehicle('Sprinter');
+              if (n > 6 && vehicle === 'SUV' && tripType === 'Hourly' && !airportRide) setVehicle('Sprinter');
             }}
           />
         </View>
         {picking === 'when' ? <WhenPicker value={when} onChange={setWhen} min={new Date()} onDone={() => setPicking('')} /> : null}
-        {passengers > seats ? <Text style={styles.over}>More than {seats} for this car: we will send two SUVs or the Sprinter and confirm the price.</Text> : null}
+        {passengers > seats ? <Text style={styles.over}>More than {seats} for this car: we will send two SUVs{airportRide ? '' : ' or the Sprinter'} and confirm the price.</Text> : null}
         {tripType === 'Round trip' && (
           <>
             <WhenField label="Return" value={back} onChange={setBack} min={when} open={picking === 'back'} onToggle={() => setPicking((p) => (p === 'back' ? '' : 'back'))} />
@@ -243,8 +250,10 @@ export default function BookScreen({ me, prefill, first, onClose, onBooked }: { 
           <View style={styles.pair}>
             {VEHICLES.map((v) => {
               const on = vehicle === v.key;
+              const off = v.key === 'Sprinter' && airportRide;
+              const line = off ? 'Not available for airport rides' : v.line;
               return (
-                <Tap key={v.key} style={[styles.vehicle, on && styles.vehicleOn]} feedback="select" onPress={() => pickVehicle(v.key)} accessibilityRole="button" accessibilityLabel={`${v.name}. ${v.line}`} accessibilityState={{ selected: on }}>
+                <Tap key={v.key} style={[styles.vehicle, on && styles.vehicleOn, off && { opacity: 0.45 }]} feedback="select" disabled={off} onPress={() => pickVehicle(v.key)} accessibilityRole="button" accessibilityLabel={`${v.name}. ${line}`} accessibilityState={{ selected: on, disabled: off }}>
                   <Image source={CAR_PHOTO[v.key]} style={[styles.vehiclePhoto, !on && { opacity: 0.7 }]} resizeMode="cover" accessibilityIgnoresInvertColors />
                   {on ? (
                     <View style={styles.vehicleCheck}>
@@ -252,7 +261,7 @@ export default function BookScreen({ me, prefill, first, onClose, onBooked }: { 
                     </View>
                   ) : null}
                   <Text style={styles.vehicleName}>{v.name}</Text>
-                  <Text style={styles.vehicleLine}>{v.line}</Text>
+                  <Text style={styles.vehicleLine}>{line}</Text>
                 </Tap>
               );
             })}

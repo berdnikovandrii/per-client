@@ -271,6 +271,16 @@ export function rideText(r: Ride) {
     .join('\n');
 }
 
+/** When a ride card may say that money is due (Andrii, 2026-11-22): a deposit that holds the booking — at once;
+ *  the ride itself — only once it is finished. A ride that is still ahead never says "Payment due", even when an
+ *  invoice is already open (the rider may simply have looked at the payment page). */
+export function paymentDue(r: Ride): 'deposit' | 'ride' | null {
+  if (r.paid || r.status === 'cancelled') return null;
+  if (r.pay_url && r.pay_kind === 'deposit') return 'deposit';
+  if (r.status === 'completed' && (r.pay_url || r.can_pay)) return 'ride';
+  return null;
+}
+
 /** A paid ride as a receipt: lines and the total (card fee only when it was paid by card). */
 export function receipt(r: Ride) {
   const fare = r.price ?? 0;

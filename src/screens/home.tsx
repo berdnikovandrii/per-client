@@ -7,7 +7,7 @@ import RideCard from '../components/ride-card';
 import Icon, { type IconName } from '../components/icon';
 import { GhostButton, GoldButton, Label, NATIVE, reduceMotion, Rise, T, Tap } from '../components/ui';
 import { AIRPORTS } from '../components/address-input';
-import { isUpcoming, PHONE, PHONE_TEL, type Me, type Ride } from '../lib/api';
+import { isUpcoming, paymentDue, PHONE, PHONE_TEL, type Me, type Ride } from '../lib/api';
 import { VEHICLES } from '../lib/estimate';
 import { CAR_PHOTO, FLEET_PHOTO } from '../lib/photos';
 import type { Prefill } from './book';
@@ -37,7 +37,7 @@ export default function HomeScreen({ me, rides, refreshing, onRefresh, onBook, o
     .filter((r) => isUpcoming(r) && r.ride_datetime)
     .sort((a, b) => new Date(a.ride_datetime!).getTime() - new Date(b.ride_datetime!).getTime())[0];
   const first = (me.name || '').trim().split(/\s+/)[0];
-  const due = rides.filter((r) => r.pay_url && !r.paid && r.status !== 'cancelled' && r.id !== next?.id);
+  const due = rides.filter((r) => paymentDue(r) && r.id !== next?.id);
 
   // the photo drifts very slowly, moves at half speed under the scroll, and stretches when the page is pulled down
   const y = useRef(new Animated.Value(0)).current;

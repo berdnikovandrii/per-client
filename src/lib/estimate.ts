@@ -11,6 +11,9 @@ export const VEHICLES: { key: VehicleKey; name: string; seats: number; line: str
 
 export type Estimate = { amount: number | null; title: string; basis: string };
 
+/** An airport (or the CBX bridge to the Tijuana airport) anywhere in the address. */
+export const isAirportPlace = (t: string) => /airport|\(san\)|\(lax\)|\bcbx\b/i.test(t || '');
+
 const SPRINTER = { first: 180, after: 160, firstHours: 5, min: 4 };
 
 export function estimate(o: {
@@ -34,7 +37,11 @@ export function estimate(o: {
       basis: h > SPRINTER.firstHours ? `${SPRINTER.firstHours} h × $${SPRINTER.first} + ${h - SPRINTER.firstHours} h × $${SPRINTER.after}` : `${h} h × $${SPRINTER.first}/h`,
     };
   }
-  if (o.passengers > 6) return custom('For more than 6 passengers we send two SUVs or the Sprinter. We will confirm the price.');
+  // the Sprinter Party Bus does not do airport rides (Andrii, 2026-11-22): a large group to an airport gets two SUVs
+  const airportRide = [o.pickup, o.dropoff, ...o.stops].some(isAirportPlace);
+  if (o.passengers > 6) {
+    return custom(airportRide ? 'For more than 6 passengers on an airport ride we send two SUVs. We will confirm the price.' : 'For more than 6 passengers we send two SUVs or the Sprinter. We will confirm the price.');
+  }
   if (!o.pickup.trim() || (o.tripType !== 'Hourly' && !o.dropoff.trim())) return null;
 
   const s = suggestTripPrice({

@@ -2,7 +2,7 @@
 // `lead` is the ride that matters most on the screen (gold hairline); `route` draws pickup and drop-off on a rail.
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { dayLabel, money, shortAddress, STATUS, timeLabel, type Ride, type RideStatus } from '../lib/api';
+import { dayLabel, money, paymentDue, shortAddress, STATUS, timeLabel, type Ride, type RideStatus } from '../lib/api';
 import { Card, Pill, RouteRail, Tap, type Tone } from './ui';
 import { C, SERIF } from '../theme';
 
@@ -37,10 +37,8 @@ export default function RideCard({ ride, onPress, lead, route }: { ride: Ride; o
           <Pill label={s.label} tone={STATUS_TONE[ride.status]} live={ride.status === 'confirmed' || ride.status === 'on_the_way' || ride.status === 'on_board'} />
           {ride.paid ? (
             <Pill label="Paid" tone="green" />
-          ) : ride.pay_url ? (
-            <Pill label={ride.pay_kind === 'deposit' ? 'Deposit due' : 'Payment due'} tone="red" />
-          ) : ride.can_pay && ride.status === 'completed' ? (
-            <Pill label="Payment due" tone="red" />
+          ) : paymentDue(ride) ? (
+            <Pill label={paymentDue(ride) === 'deposit' ? 'Deposit due' : 'Payment due'} tone="red" />
           ) : null}
           {ride.card?.needed ? <Pill label="Add a card" tone="gold" /> : null}
           {ride.status === 'completed' && !ride.rating ? <Pill label="Rate your ride" tone="gold" icon="star" /> : null}

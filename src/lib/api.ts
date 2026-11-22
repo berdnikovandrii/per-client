@@ -162,6 +162,19 @@ export async function payUrl(rideId: number): Promise<string> {
   return out.url;
 }
 
+/** Our receipt by email, with a PDF copy: goes to the address of the account. Returns that address. */
+export async function emailReceipt(rideId: number): Promise<string> {
+  const { data } = await supabase.auth.getSession();
+  const res = await fetch(`${FUNCTIONS_URL}/receipt`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', apikey: ANON, Authorization: `Bearer ${data.session?.access_token || ANON}` },
+    body: JSON.stringify({ rideId }),
+  });
+  const out = (await res.json().catch(() => ({}))) as { ok?: boolean; to?: string; error?: string };
+  if (!res.ok || !out.ok) throw new Error(out.error || 'Could not send the receipt. Please try again.');
+  return out.to || '';
+}
+
 export async function rate(rideId: number, stars: number, comment: string) {
   const { error } = await supabase.rpc('client_rate', { p_lead_id: rideId, p_stars: stars, p_comment: comment || null });
   if (error) throw new Error(error.message);

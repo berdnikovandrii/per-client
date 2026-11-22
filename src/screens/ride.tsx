@@ -10,7 +10,7 @@ import LiveMap from '../components/live-map';
 import Icon from '../components/icon';
 import { Card, GhostButton, GoldButton, haptic, Label, Pill, reduceMotion, Rise, RouteRail, T, Tap } from '../components/ui';
 import {
-  agoLabel, cancelRequest, isAirportText, money, money2, PHONE, PHONE_TEL, payUrl, rate, receipt, receiptText, REVIEW_URL, rideText,
+  agoLabel, cancelRequest, emailReceipt, isAirportText, money, money2, PHONE, PHONE_TEL, payUrl, rate, receipt, receiptText, REVIEW_URL, rideText,
   STATUS, timeLabel, whenLabel, type Ride, type RideStatus,
 } from '../lib/api';
 import { addRideToCalendar, calendarAvailable } from '../lib/calendar';
@@ -36,7 +36,7 @@ const clock = (iso: string) => new Date(iso).toLocaleTimeString('en-US', { hour:
 const brandName = (b: string | null) => (b ? BRANDS[b] || b.replace(/_/g, ' ') : 'Card');
 
 export default function RideScreen({ ride, onClose, onChanged, onBookAgain }: Props) {
-  const [busy, setBusy] = useState<'' | 'cancel' | 'pay' | 'rate' | 'card'>('');
+  const [busy, setBusy] = useState<'' | 'cancel' | 'pay' | 'rate' | 'card' | 'mail'>('');
   const [error, setError] = useState('');
   const [note, setNote] = useState('');
   const [stars, setStars] = useState(ride.rating || 0);
@@ -139,6 +139,21 @@ export default function RideScreen({ ride, onClose, onChanged, onBookAgain }: Pr
       if (Platform.OS === 'web') await Linking.openURL(ride.card.url);
       else await WebBrowser.openBrowserAsync(ride.card.url, { presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET });
       onChanged(); // back from the page: the card shows as saved
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy('');
+    }
+  }
+
+  /** The receipt in our own look, with a PDF, to the rider's email. */
+  const [mailedTo, setMailedTo] = useState('');
+  async function mailReceipt() {
+    setBusy('mail');
+    setError('');
+    try {
+      setMailedTo(await emailReceipt(ride.id));
+      haptic.success();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -404,7 +419,9 @@ export default function RideScreen({ ride, onClose, onChanged, onBookAgain }: Pr
                   `Ride #${ride.id}`,
                 ].filter(Boolean).join(' · ')}
               </Text>
-              <GhostButton label="Share or save receipt" icon="share" onPress={() => Share.share({ message: receiptText(ride) }).catch(() => {})} />
+              <GhostButton label={mailedTo ? 'Email it again' : 'Email me the receipt (PDF)'} icon="mail" busy={busy === 'mail'} onPress={mailReceipt} />
+              {mailedTo ? <Text style={styles.hintCenter} accessibilityLiveRegion="polite">Sent to {mailedTo}. It arrives within a minute.</Text> : null}
+              <GhostButton label="Share as text" icon="share" onPress={() => Share.share({ message: receiptText(ride) }).catch(() => {})} />
             </>
           ) : (
             <>

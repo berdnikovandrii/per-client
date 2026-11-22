@@ -75,6 +75,23 @@ export default function RideScreen({ ride, onClose, onChanged, onBookAgain }: Pr
     };
   }, [moving, onChanged]);
 
+  // Back from the payment page: Square tells us about the payment within a minute, so keep asking until the
+  // ride shows as paid (or for two and a half minutes — the page may have been closed without paying)
+  const [checkingPay, setCheckingPay] = useState(false);
+  useEffect(() => {
+    if (!checkingPay) return;
+    if (ride.paid) {
+      setCheckingPay(false);
+      return;
+    }
+    const poll = setInterval(onChanged, 5_000);
+    const stop = setTimeout(() => setCheckingPay(false), 150_000);
+    return () => {
+      clearInterval(poll);
+      clearTimeout(stop);
+    };
+  }, [checkingPay, ride.paid, onChanged]);
+
   async function doCancel() {
     setBusy('cancel');
     setError('');
@@ -104,7 +121,8 @@ export default function RideScreen({ ride, onClose, onChanged, onBookAgain }: Pr
       const url = ride.pay_url || (await payUrl(ride.id));
       if (Platform.OS === 'web') await Linking.openURL(url);
       else await WebBrowser.openBrowserAsync(url, { presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET });
-      onChanged(); // back from the payment page: Square reports the payment within a minute
+      setCheckingPay(true); // back from the payment page: see the effect above
+      onChanged();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -407,6 +425,11 @@ export default function RideScreen({ ride, onClose, onChanged, onBookAgain }: Pr
                     onPress={pay}
                     busy={busy === 'pay'}
                   />
+                  {checkingPay ? (
+                    <Text style={[styles.hintCenter, { color: C.goldHi }]} accessibilityLiveRegion="polite">
+                      Just paid? We are confirming it with Square. It shows here within a minute, no need to pay again.
+                    </Text>
+                  ) : null}
                   <Text style={styles.hintCenter}>
                     Secure payment by Square, with Apple Pay. The card price includes a 3.5% processing fee; you can add a gratuity there. Zelle and Venmo have no fee: text us and we send the details.
                   </Text>

@@ -2,7 +2,7 @@
 // and — after the ride — a rating and "Book again". While the chauffeur is on the way or the rider is on board,
 // the car is on a map and the screen asks for a fresh position every 12 seconds.
 import { useEffect, useRef, useState } from 'react';
-import { Alert, Animated, Easing, Linking, Platform, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Animated, Easing, Linking, Platform, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import FlightCard from '../components/flight-card';
@@ -14,6 +14,7 @@ import {
   STATUS, timeLabel, whenLabel, type Ride, type RideStatus,
 } from '../lib/api';
 import { addRideToCalendar, calendarAvailable } from '../lib/calendar';
+import { shareText, webConfirm } from '../lib/layout';
 import { C, SERIF } from '../theme';
 
 const STEPS: { key: RideStatus; label: string }[] = [
@@ -106,7 +107,10 @@ export default function RideScreen({ ride, onClose, onChanged, onBookAgain }: Pr
     }
   }
   function cancel() {
-    if (Platform.OS === 'web') return void doCancel();
+    if (Platform.OS === 'web') {
+      if (webConfirm('Cancel this request? It has not been confirmed yet, so there is no charge.')) void doCancel();
+      return;
+    }
     Alert.alert('Cancel this request?', 'It has not been confirmed yet, so there is no charge.', [
       { text: 'Keep it', style: 'cancel' },
       { text: 'Cancel request', style: 'destructive', onPress: doCancel },
@@ -301,7 +305,7 @@ export default function RideScreen({ ride, onClose, onChanged, onBookAgain }: Pr
                 {calendarAvailable && ride.ride_datetime ? (
                   <GhostButton label="Add to Calendar" icon="calendarPlus" style={{ flex: 1 }} onPress={() => addRideToCalendar(ride).then(setNote).catch((e) => setNote(e instanceof Error ? e.message : String(e)))} />
                 ) : null}
-                <GhostButton label="Share ride" icon="share" style={{ flex: 1 }} onPress={() => Share.share({ message: rideText(ride) }).catch(() => {})} />
+                <GhostButton label="Share ride" icon="share" style={{ flex: 1 }} onPress={() => shareText(rideText(ride)).catch(() => {})} />
               </View>
             )}
             {!!note && <Text style={styles.hint}>{note}</Text>}
@@ -421,7 +425,7 @@ export default function RideScreen({ ride, onClose, onChanged, onBookAgain }: Pr
               </Text>
               <GhostButton label={mailedTo ? 'Email it again' : 'Email me the receipt (PDF)'} icon="mail" busy={busy === 'mail'} onPress={mailReceipt} />
               {mailedTo ? <Text style={styles.hintCenter} accessibilityLiveRegion="polite">Sent to {mailedTo}. It arrives within a minute.</Text> : null}
-              <GhostButton label="Share as text" icon="share" onPress={() => Share.share({ message: receiptText(ride) }).catch(() => {})} />
+              <GhostButton label="Share as text" icon="share" onPress={() => shareText(receiptText(ride)).catch(() => {})} />
             </>
           ) : (
             <>

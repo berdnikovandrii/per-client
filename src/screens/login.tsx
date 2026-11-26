@@ -10,9 +10,9 @@ import { GoldButton, NATIVE, reduceMotion, Rise, T, Tap } from '../components/ui
 import { PHONE, PHONE_TEL, SITE, sendCode, verifyCode } from '../lib/api';
 import { FLEET_PHOTO } from '../lib/photos';
 import { C, SERIF } from '../theme';
-import { useAppWidth } from '../lib/layout';
+import { useAppWidth, webNotice } from '../lib/layout';
 
-const say = (title: string, message: string) => (Platform.OS === 'web' ? console.log(title, message) : Alert.alert(title, message));
+const say = (title: string, message: string) => (Platform.OS === 'web' ? webNotice(`${title}. ${message}`) : Alert.alert(title, message));
 
 type Props = {
   /** shown above the card, e.g. why we ask now */

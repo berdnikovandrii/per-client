@@ -1,6 +1,6 @@
 // Account: name and mobile (what the chauffeur sees), legal links, sign out, delete the account.
 import { useState } from 'react';
-import { Alert, Linking, Platform, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import { Alert, Linking, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Constants from 'expo-constants';
 import * as Updates from 'expo-updates';
@@ -8,6 +8,7 @@ import AddressInput, { placesDebug } from '../components/address-input';
 import Icon, { type IconName } from '../components/icon';
 import { Card, Field, GhostButton, GoldButton, haptic, Label, Medal, Rise, T, Tap } from '../components/ui';
 import { deleteAccount, PHONE, PHONE_TEL, savePlaces, saveProfile, SITE, type Me, type Place } from '../lib/api';
+import { shareText, webConfirm } from '../lib/layout';
 import { supabase } from '../lib/supabase';
 import { C, SERIF, TAB_SPACE } from '../theme';
 
@@ -67,7 +68,10 @@ export default function AccountScreen({ me, onSaved }: { me: Me; onSaved: () => 
     }
   }
   function askDelete() {
-    if (Platform.OS === 'web') return void reallyDelete();
+    if (Platform.OS === 'web') {
+      if (webConfirm('Delete your account? Your sign-in and profile are removed right away. Rides you already took stay in our records, as the law requires for a licensed carrier, without a link to this account.')) void reallyDelete();
+      return;
+    }
     Alert.alert(
       'Delete your account?',
       'Your sign-in, profile and this phone\'s notifications are removed right away. Rides you already took stay in our records, as the law requires for a licensed carrier, without a link to this account.',
@@ -138,7 +142,7 @@ export default function AccountScreen({ me, onSaved }: { me: Me; onSaved: () => 
             <GhostButton
               label="Share my code"
               icon="gift"
-              onPress={() => Share.share({ message: `I ride with Pacific Elite Rides in San Diego. Use my code ${me.ref_code} when you book your first ride in the app: ${SITE}` }).catch(() => {})}
+              onPress={() => shareText(`I ride with Pacific Elite Rides in San Diego. Use my code ${me.ref_code} when you book your first ride in the app: ${SITE}`).catch(() => {})}
             />
           </Card>
         </Rise>

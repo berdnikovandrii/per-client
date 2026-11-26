@@ -14,7 +14,7 @@ import { C, SERIF, TAB_SPACE } from '../theme';
 
 const placeIcon = (label: string): IconName => (/home/i.test(label) ? 'home' : /office|work/i.test(label) ? 'briefcase' : 'pin');
 
-export default function AccountScreen({ me, onSaved }: { me: Me; onSaved: () => void }) {
+export default function AccountScreen({ me, onSaved, wide }: { me: Me; onSaved: () => void; /** website layout: the profile on the left, help and sign-out on the right */ wide?: boolean }) {
   const [name, setName] = useState(me.name || '');
   const [phone, setPhone] = useState(me.phone || '');
   const [busy, setBusy] = useState(false);
@@ -82,13 +82,8 @@ export default function AccountScreen({ me, onSaved }: { me: Me; onSaved: () => 
     );
   }
 
-  return (
-    <ScrollView style={{ backgroundColor: C.bg }} contentContainerStyle={[styles.body, { paddingTop: insets.top + 14, paddingBottom: TAB_SPACE + insets.bottom }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-      <View>
-        <Text style={T.title} accessibilityRole="header">Account</Text>
-        <Text style={styles.email}>{me.email}</Text>
-      </View>
-
+  const main = (
+    <>
       <Rise style={{ gap: 12 }}>
         <View style={styles.pair}>
           <Field label="Name" value={name} onChangeText={setName} placeholder="First and last name" textContentType="name" style={{ flex: 1 }} />
@@ -147,7 +142,9 @@ export default function AccountScreen({ me, onSaved }: { me: Me; onSaved: () => 
           </Card>
         </Rise>
       ) : null}
-
+    </>
+  );
+  const side = (
       <Rise delay={200} style={{ gap: 12 }}>
         <Help />
         <Legal />
@@ -157,6 +154,26 @@ export default function AccountScreen({ me, onSaved }: { me: Me; onSaved: () => 
         </View>
         <Version />
       </Rise>
+  );
+
+  return (
+    <ScrollView style={{ backgroundColor: C.bg }} contentContainerStyle={[styles.body, { paddingTop: insets.top + 14, paddingBottom: wide ? 48 : TAB_SPACE + insets.bottom }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+      <View>
+        <Text style={T.title} accessibilityRole="header">Account</Text>
+        <Text style={styles.email}>{me.email}</Text>
+      </View>
+
+      {wide ? (
+        <View style={styles.wideRow}>
+          <View style={styles.wideMain}>{main}</View>
+          <View style={styles.wideSide}>{side}</View>
+        </View>
+      ) : (
+        <>
+          {main}
+          {side}
+        </>
+      )}
     </ScrollView>
   );
 }
@@ -239,6 +256,9 @@ function Link({ text, onPress, danger, icon, last }: { text: string; onPress: ()
 
 const styles = StyleSheet.create({
   body: { paddingHorizontal: 20, gap: 22 },
+  wideRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 40 },
+  wideMain: { flex: 1, gap: 22 },
+  wideSide: { width: 380 },
   email: { fontSize: 15, color: C.muted, marginTop: 4 },
   pair: { flexDirection: 'row', gap: 12 },
   saved: { fontSize: 14, fontWeight: '600', color: C.green, textAlign: 'center' },

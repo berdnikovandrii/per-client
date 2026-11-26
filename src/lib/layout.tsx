@@ -1,70 +1,60 @@
 // The same app in a browser — the client account on the web (Andrii, 2026-11-25).
-// On a phone it fills the screen exactly as on the iPhone. On a wide screen it stays one column in the middle:
-// the screens are designed for a phone's width, so they keep it instead of stretching across a monitor.
-import type { ReactNode } from 'react';
-import { Linking, Platform, Share, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
-import { PHONE, PHONE_TEL, SITE } from './api';
-import { C, SERIF } from '../theme';
+// On a phone it fills the screen exactly as on the iPhone. On a narrow window it stays one column in the middle.
+// On a computer (DESKTOP and wider) it is laid out as a website: a menu on top, the booking form on the first
+// page, lists beside their details (src/screens/desktop.tsx).
+import { createContext, useContext, type ReactNode } from 'react';
+import { Platform, Share, useWindowDimensions, View } from 'react-native';
+import { C } from '../theme';
 
 export const WEB = Platform.OS === 'web';
-/** The widest the app's column gets in a browser. */
+/** The widest the phone layout gets in a browser. */
 export const COLUMN = 520;
-/** From this width up there is room for the brand panel beside the column. */
-const WIDE = 1080;
-const APP_STORE = 'https://apps.apple.com/app/id6833778131';
+/** From this window width up the browser gets the website layout. */
+export const DESKTOP = 1100;
+export const APP_STORE = 'https://apps.apple.com/app/id6833778131';
 
-/** The width the screens lay themselves out in: the window on a phone, the column in a wide browser. */
+/** True in a browser window wide enough for the website layout. Always false on the iPhone. */
+export function useDesktop() {
+  const { width } = useWindowDimensions();
+  return WEB && width >= DESKTOP;
+}
+
+/** A panel that hosts a phone-width screen (a dialog, the booking card) tells the screen how wide it is. */
+const PanelWidth = createContext<number | null>(null);
+export const PanelWidthProvider = PanelWidth.Provider;
+
+/** The width the screens lay themselves out in: the window on a phone, the column or the panel in a browser. */
 export function useAppWidth() {
   const { width } = useWindowDimensions();
+  const panel = useContext(PanelWidth);
+  if (panel != null) return panel;
   return WEB ? Math.min(width, COLUMN) : width;
 }
 
-/** The root and every sheet on the web sit in this column; on the iPhone it adds nothing. */
+/** The root and every sheet on a narrow browser window sit in this column; on the iPhone, and in the website
+ *  layout, it adds nothing. */
 export function Column({ children }: { children: ReactNode }) {
-  const { width } = useWindowDimensions();
-  if (!WEB) return <>{children}</>;
-  const wide = width >= WIDE;
+  const desktop = useDesktop();
+  if (!WEB || desktop) return <>{children}</>;
   return (
-    <View style={{ flex: 1, flexDirection: 'row', justifyContent: 'center', backgroundColor: '#050506' }}>
-      {wide ? <Aside /> : null}
+    <View style={{ flex: 1, alignItems: 'center', backgroundColor: '#050506' }}>
       <View style={{ flex: 1, width: '100%', maxWidth: COLUMN, backgroundColor: C.bg, overflow: 'hidden' }}>{children}</View>
     </View>
   );
 }
 
-/** Wide screens only: who we are and how to reach us, beside the account itself. */
-function Aside() {
-  const open = (url: string) => Linking.openURL(url).catch(() => {});
+/** A sheet: the whole screen on a phone, a centered window over the dimmed page in the website layout. */
+export function Dialog({ children, width = 480 }: { children: ReactNode; width?: number }) {
+  const desktop = useDesktop();
+  if (!desktop) return <Column>{children}</Column>;
   return (
-    <View style={aside.box}>
-      <Text style={aside.kicker}>PACIFIC ELITE RIDES</Text>
-      <Text style={[aside.title, SERIF]} accessibilityRole="header">Your rides,{'\n'}in one place</Text>
-      <Text style={aside.text}>Book a black car in San Diego, follow your chauffeur on the map, pay by card and keep every receipt.</Text>
-      <View style={aside.rule} />
-      {['Flat rates, no surge: the price you see is the price you pay', 'Flight tracked on every airport pickup', 'One account here and in the iPhone app'].map((line) => (
-        <Text key={line} style={aside.point}>·  {line}</Text>
-      ))}
-      <View style={aside.links}>
-        <Text style={aside.link} accessibilityRole="link" onPress={() => open(`tel:${PHONE_TEL}`)}>{PHONE}</Text>
-        <Text style={aside.link} accessibilityRole="link" onPress={() => open(APP_STORE)}>Get the iPhone app</Text>
-        <Text style={aside.link} accessibilityRole="link" onPress={() => open(SITE)}>pacificeliterides.com</Text>
-      </View>
-      <Text style={aside.small}>Pacific Elite Rides LLC · TCP 35857B</Text>
+    <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(0,0,0,0.66)' }}>
+      <PanelWidthProvider value={width}>
+        <View style={{ width, height: '90%', maxHeight: 760, borderRadius: 28, overflow: 'hidden', backgroundColor: C.bg, borderWidth: 1, borderColor: C.lineHi }}>{children}</View>
+      </PanelWidthProvider>
     </View>
   );
 }
-
-const aside = StyleSheet.create({
-  box: { width: 400, marginRight: 72, justifyContent: 'center', paddingVertical: 40 },
-  kicker: { fontSize: 12, letterSpacing: 3.2, fontWeight: '700', color: C.gold },
-  title: { fontSize: 52, lineHeight: 58, color: '#FFFFFF', marginTop: 18 },
-  text: { fontSize: 17, lineHeight: 26, color: C.muted, marginTop: 18 },
-  rule: { height: 1, backgroundColor: C.line, marginVertical: 28 },
-  point: { fontSize: 15, lineHeight: 24, color: C.muted, marginBottom: 8 },
-  links: { marginTop: 24, gap: 12 },
-  link: { fontSize: 16, fontWeight: '600', color: C.gold },
-  small: { fontSize: 12, color: C.faint, marginTop: 36 },
-});
 
 /** The browser has no native alert sheet: a web page asks with the browser's own dialog instead. */
 export function webConfirm(question: string): boolean {

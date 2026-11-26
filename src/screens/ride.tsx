@@ -25,7 +25,7 @@ const STEPS: { key: RideStatus; label: string }[] = [
   { key: 'completed', label: 'Done' },
 ];
 
-type Props = { ride: Ride; onClose: () => void; onChanged: () => void; onBookAgain: (r: Ride) => void };
+type Props = { ride: Ride; onClose: () => void; onChanged: () => void; onBookAgain: (r: Ride) => void; /** shown beside the list (website layout): no Done */ embedded?: boolean };
 
 const hoursLabel = (h: number) => `${h} hour${h === 1 ? '' : 's'}`;
 /** What one car of a multi-car booking is doing right now. */
@@ -36,7 +36,7 @@ const etaLeft = (iso: string, now: number) => Math.round((new Date(iso).getTime(
 const clock = (iso: string) => new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 const brandName = (b: string | null) => (b ? BRANDS[b] || b.replace(/_/g, ' ') : 'Card');
 
-export default function RideScreen({ ride, onClose, onChanged, onBookAgain }: Props) {
+export default function RideScreen({ ride, onClose, onChanged, onBookAgain, embedded }: Props) {
   const [busy, setBusy] = useState<'' | 'cancel' | 'pay' | 'rate' | 'card' | 'mail'>('');
   const [error, setError] = useState('');
   const [note, setNote] = useState('');
@@ -191,9 +191,11 @@ export default function RideScreen({ ride, onClose, onChanged, onBookAgain }: Pr
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <View style={[styles.header, Platform.OS !== 'ios' && { paddingTop: insets.top + 14 }]}>
         <Text style={styles.when} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.7} accessibilityRole="header">{whenLabel(ride.ride_datetime)}</Text>
-        <Tap onPress={onClose} hitSlop={10} style={styles.close} accessibilityRole="button">
-          <Text style={styles.closeText}>Done</Text>
-        </Tap>
+        {embedded ? null : (
+          <Tap onPress={onClose} hitSlop={10} style={styles.close} accessibilityRole="button">
+            <Text style={styles.closeText}>Done</Text>
+          </Tap>
+        )}
       </View>
       <ScrollView contentContainerStyle={[styles.body, { paddingBottom: 28 + insets.bottom }]} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         {ride.status !== 'cancelled' ? (

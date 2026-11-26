@@ -18,13 +18,13 @@ type Props = { me: Me; rides: Ride[]; refreshing: boolean; onRefresh: () => void
 
 const SAN = AIRPORTS[0].value;
 const LAX = AIRPORTS[1].value;
-const SHORTCUTS: { title: string; line: string; prefill: Prefill }[] = [
+export const SHORTCUTS: { title: string; line: string; prefill: Prefill }[] = [
   { title: 'To SAN Airport', line: 'Flat rates from $60', prefill: { dropoff: SAN } },
   { title: 'From SAN Airport', line: 'Flight tracked · 60 min free waiting', prefill: { pickup: SAN } },
   { title: 'San Diego ↔ LAX', line: '$375 one way · $700 round trip', prefill: { dropoff: LAX } },
   { title: 'By the hour', line: 'SUV $95/h · Sprinter $180/h', prefill: { tripType: 'Hourly' } },
 ];
-const PROMISES: { icon: IconName; text: string }[] = [
+export const PROMISES: { icon: IconName; text: string }[] = [
   { icon: 'receipt', text: 'The price you see is the price you pay: fuel and tolls included' },
   { icon: 'clock', text: 'Airport pickups: 60 minutes of free waiting, 90 for international' },
   { icon: 'shield', text: 'Licensed and insured · TCP 35857B' },

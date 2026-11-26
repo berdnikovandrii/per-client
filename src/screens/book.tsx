@@ -35,7 +35,7 @@ function defaultWhen() {
   return d;
 }
 
-export default function BookScreen({ me, prefill, first, onClose, onBooked }: { me: Me; prefill?: Prefill; /** no rides yet: offer the invite-code field */ first?: boolean; onClose: () => void; onBooked: (id: number) => void }) {
+export default function BookScreen({ me, prefill, first, embedded, onClose, onBooked }: { me: Me; prefill?: Prefill; /** no rides yet: offer the invite-code field */ first?: boolean; /** the form sits in a card on the page (website layout): no Close */ embedded?: boolean; onClose: () => void; onBooked: (id: number) => void }) {
   const [tripType, setTripType] = useState<Booking['trip_type']>(prefill?.tripType || 'One way');
   const [pickup, setPickup] = useState(prefill?.pickup || '');
   const [dropoff, setDropoff] = useState(prefill?.dropoff || '');
@@ -178,10 +178,12 @@ export default function BookScreen({ me, prefill, first, onClose, onBooked }: { 
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: C.bg }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={[styles.header, Platform.OS !== 'ios' && { paddingTop: insets.top + 14 }]}>
-        <Text style={[T.title, { fontSize: 38 }]} accessibilityRole="header">Book a ride</Text>
-        <Tap onPress={onClose} hitSlop={10} style={styles.close} accessibilityRole="button">
-          <Text style={styles.closeText}>Close</Text>
-        </Tap>
+        <Text style={[T.title, { fontSize: embedded ? 32 : 38 }]} accessibilityRole="header">Book a ride</Text>
+        {embedded ? null : (
+          <Tap onPress={onClose} hitSlop={10} style={styles.close} accessibilityRole="button">
+            <Text style={styles.closeText}>Close</Text>
+          </Tap>
+        )}
       </View>
       <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
         <Segment

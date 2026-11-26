@@ -24,7 +24,8 @@ import AccountScreen, { GuestAccount } from './src/screens/account';
 import Icon, { type IconName } from './src/components/icon';
 import { GoldButton, Medal, NATIVE, reduceMotion, T, Tap } from './src/components/ui';
 import { C } from './src/theme';
-import { Column } from './src/lib/layout';
+import { Column, Dialog, useDesktop } from './src/lib/layout';
+import { Backdrop, DesktopAccount, DesktopHome, DesktopRides, TopNav } from './src/screens/desktop';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({ shouldShowBanner: true, shouldShowList: true, shouldPlaySound: true, shouldSetBadge: false }),
@@ -62,6 +63,20 @@ function Main({ session }: { session: Session | null }) {
   const [open, setOpen] = useState<Ride | null>(null);
   const [booking, setBooking] = useState<Prefill | null>(null);
   const pushDone = useRef(false);
+  // The website layout (a computer's browser): the booking form lives on the first page instead of a sheet,
+  // and a ride opens beside the list on My rides. `form.key` restarts the form with a new prefill.
+  const desktop = useDesktop();
+  const [form, setForm] = useState<{ key: number; prefill: Prefill }>({ key: 0, prefill: {} });
+  const pageY = useRef(new Animated.Value(0)).current;
+  const startBooking = (p?: Prefill) => {
+    if (!desktop) return setBooking(p || {});
+    if (p && Object.keys(p).length) setForm((f) => ({ key: f.key + 1, prefill: p }));
+    setTab('home');
+  };
+  const showRide = (r: Ride) => {
+    if (desktop) setTab('rides');
+    setOpen(r);
+  };
 
   const refresh = useCallback(async () => {
     if (!signedIn.current) return [] as Ride[];
@@ -144,6 +159,14 @@ function Main({ session }: { session: Session | null }) {
     };
   }, [refresh]);
 
+  // website layout: My rides always shows a ride beside the list — the next one, or the latest
+  useEffect(() => {
+    if (!desktop || tab !== 'rides' || open || rides.length === 0) return;
+    const t = (r: Ride) => new Date(r.ride_datetime || r.created_at).getTime();
+    const ahead = rides.filter((r) => isUpcoming(r)).sort((a, b) => t(a) - t(b));
+    setOpen(ahead[0] || [...rides].sort((a, b) => t(b) - t(a))[0]);
+  }, [desktop, tab, open, rides]);
+
   if (me === undefined) {
     return (
       <View style={styles.center}>
@@ -166,6 +189,76 @@ function Main({ session }: { session: Session | null }) {
   }
 
   const upcoming = rides.filter((r) => isUpcoming(r)).length;
+  const bookAgain = (r: Ride): Prefill => ({
+    pickup: r.pickup || '',
+    dropoff: r.dropoff || '',
+    stops: r.stops,
+    tripType: r.trip_type === 'Hourly' ? 'Hourly' : 'One way',
+    passengers: parseInt(r.passengers || '', 10) || undefined,
+    vehicle: /sprinter/i.test(r.vehicle || '') ? 'Sprinter' : 'SUV',
+    hours: r.hours || undefined,
+  });
+  const loginSheet = (
+    <Modal visible={signIn && !userId} transparent={desktop} animationType={desktop ? 'fade' : 'slide'} presentationStyle={desktop ? undefined : 'pageSheet'} onRequestClose={() => setSignIn(false)}>
+      <Dialog>
+        <Login onCancel={() => setSignIn(false)} onDone={() => setSignIn(false)} />
+      </Dialog>
+    </Modal>
+  );
+
+  if (desktop) {
+    return (
+      <View style={{ flex: 1, backgroundColor: C.bg }}>
+        <Backdrop hidden={tab !== 'home'} y={pageY} />
+        <TopNav tab={tab} onTab={setTab} upcoming={upcoming} onBook={() => startBooking()} />
+        {/* the first page stays mounted, so a half-filled booking form survives a look at My rides */}
+        <DesktopHome
+          me={me}
+          rides={rides}
+          hidden={tab !== 'home'}
+          y={pageY}
+          onOpen={showRide}
+          onPrefill={startBooking}
+          form={
+            <BookScreen
+              embedded
+              key={form.key}
+              me={me}
+              prefill={form.prefill}
+              first={rides.length === 0}
+              onClose={() => {}}
+              onBooked={(id) => {
+                setForm((f) => ({ key: f.key + 1, prefill: {} }));
+                setTab('rides');
+                reloadMe();
+                refresh().then((list) => {
+                  const r = list.find((x) => x.id === id);
+                  if (r) setOpen(r);
+                });
+              }}
+            />
+          }
+        />
+        {tab === 'rides' && (
+          <Fade>
+            <DesktopRides
+              empty={rides.length === 0}
+              list={<RidesScreen rides={rides} refreshing={refreshing} onRefresh={refresh} onOpen={setOpen} onBook={() => startBooking()} onSignIn={userId ? undefined : () => setSignIn(true)} selectedId={open?.id} />}
+              detail={open ? <RideScreen embedded key={open.id} ride={open} onClose={() => setOpen(null)} onChanged={refresh} onBookAgain={(r) => startBooking(bookAgain(r))} /> : null}
+            />
+          </Fade>
+        )}
+        {tab === 'account' && (
+          <Fade>
+            <DesktopAccount narrow={!(userId && me.id)}>
+              {userId && me.id ? <AccountScreen key={me.id} me={me} onSaved={reloadMe} wide /> : <GuestAccount onSignIn={() => setSignIn(true)} />}
+            </DesktopAccount>
+          </Fade>
+        )}
+        {loginSheet}
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
@@ -195,11 +288,7 @@ function Main({ session }: { session: Session | null }) {
           );
         })}
       </View>
-      <Modal visible={signIn && !userId} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSignIn(false)}>
-        <Column>
-          <Login onCancel={() => setSignIn(false)} onDone={() => setSignIn(false)} />
-        </Column>
-      </Modal>
+      {loginSheet}
       <Modal visible={!!booking} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setBooking(null)}>
         {booking && (
           <Column>
@@ -227,15 +316,7 @@ function Main({ session }: { session: Session | null }) {
             onChanged={refresh}
             onBookAgain={(r) => {
               setOpen(null);
-              setBooking({
-                pickup: r.pickup || '',
-                dropoff: r.dropoff || '',
-                stops: r.stops,
-                tripType: r.trip_type === 'Hourly' ? 'Hourly' : 'One way',
-                passengers: parseInt(r.passengers || '', 10) || undefined,
-                vehicle: /sprinter/i.test(r.vehicle || '') ? 'Sprinter' : 'SUV',
-                hours: r.hours || undefined,
-              });
+              setBooking(bookAgain(r));
             }}
           />
           </Column>

@@ -7,11 +7,11 @@ import { GoldButton, Medal, Rise, Segment, T, Tap } from '../components/ui';
 import { isUpcoming, paymentDue, type Ride } from '../lib/api';
 import { C, TAB_SPACE } from '../theme';
 
-type Props = { rides: Ride[]; refreshing: boolean; onRefresh: () => void; onOpen: (r: Ride) => void; onBook: () => void; /** not signed in: offer to */ onSignIn?: () => void };
+type Props = { rides: Ride[]; refreshing: boolean; onRefresh: () => void; onOpen: (r: Ride) => void; onBook: () => void; /** not signed in: offer to */ onSignIn?: () => void; /** website layout: the ride shown beside the list */ selectedId?: number };
 
 const VIEWS = ['Upcoming', 'Past'] as const;
 
-export default function RidesScreen({ rides, refreshing, onRefresh, onOpen, onBook, onSignIn }: Props) {
+export default function RidesScreen({ rides, refreshing, onRefresh, onOpen, onBook, onSignIn, selectedId }: Props) {
   const insets = useSafeAreaInsets();
   const t = (r: Ride) => new Date(r.ride_datetime || r.created_at).getTime();
   const upcoming = rides.filter((r) => isUpcoming(r)).sort((a, b) => t(a) - t(b));
@@ -25,11 +25,11 @@ export default function RidesScreen({ rides, refreshing, onRefresh, onOpen, onBo
     <FlatList
       style={{ backgroundColor: C.bg }}
       data={list}
-      extraData={shown}
+      extraData={`${shown}:${selectedId}`}
       keyExtractor={(r) => String(r.id)}
       renderItem={({ item, index }) => (
         <Rise key={`${shown}:${item.id}`} delay={Math.min(index, 5) * 70}>
-          <RideCard ride={item} lead={shown === 'Upcoming' && index === 0} onPress={() => onOpen(item)} />
+          <RideCard ride={item} lead={selectedId != null ? item.id === selectedId : shown === 'Upcoming' && index === 0} onPress={() => onOpen(item)} />
         </Rise>
       )}
       contentContainerStyle={{ paddingTop: insets.top + 14, paddingHorizontal: 20, paddingBottom: TAB_SPACE + insets.bottom, flexGrow: 1 }}

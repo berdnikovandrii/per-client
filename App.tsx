@@ -24,6 +24,7 @@ import AccountScreen, { GuestAccount } from './src/screens/account';
 import Icon, { type IconName } from './src/components/icon';
 import { GoldButton, Medal, NATIVE, reduceMotion, T, Tap } from './src/components/ui';
 import { C } from './src/theme';
+import { Column } from './src/lib/layout';
 
 Notifications.setNotificationHandler({
   handleNotification: async () => ({ shouldShowBanner: true, shouldShowList: true, shouldPlaySound: true, shouldSetBadge: false }),
@@ -195,10 +196,13 @@ function Main({ session }: { session: Session | null }) {
         })}
       </View>
       <Modal visible={signIn && !userId} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setSignIn(false)}>
-        <Login onCancel={() => setSignIn(false)} onDone={() => setSignIn(false)} />
+        <Column>
+          <Login onCancel={() => setSignIn(false)} onDone={() => setSignIn(false)} />
+        </Column>
       </Modal>
       <Modal visible={!!booking} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setBooking(null)}>
         {booking && (
+          <Column>
           <BookScreen
             me={me}
             prefill={booking}
@@ -211,10 +215,12 @@ function Main({ session }: { session: Session | null }) {
               refresh();
             }}
           />
+          </Column>
         )}
       </Modal>
       <Modal visible={!!open} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setOpen(null)}>
         {open && (
+          <Column>
           <RideScreen
             ride={open}
             onClose={() => setOpen(null)}
@@ -232,6 +238,7 @@ function Main({ session }: { session: Session | null }) {
               });
             }}
           />
+          </Column>
         )}
       </Modal>
     </View>
@@ -254,7 +261,9 @@ export default function App() {
       {/* each screen keeps clear of the status bar itself: the home photo runs under it */}
       <View style={{ flex: 1, backgroundColor: C.bg }}>
         {ready ? (
-          <Main session={session!} />
+          <Column>
+            <Main session={session!} />
+          </Column>
         ) : (
           <View style={styles.center}>
             <ActivityIndicator color={C.gold} />

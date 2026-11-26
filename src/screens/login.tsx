@@ -10,6 +10,7 @@ import { GoldButton, NATIVE, reduceMotion, Rise, T, Tap } from '../components/ui
 import { PHONE, PHONE_TEL, SITE, sendCode, verifyCode } from '../lib/api';
 import { FLEET_PHOTO } from '../lib/photos';
 import { C, SERIF } from '../theme';
+import { useAppWidth } from '../lib/layout';
 
 const say = (title: string, message: string) => (Platform.OS === 'web' ? console.log(title, message) : Alert.alert(title, message));
 
@@ -29,7 +30,8 @@ export default function Login({ reason, onDone, onCancel }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [focus, setFocus] = useState(false);
-  const { width, height } = useWindowDimensions();
+  const { height } = useWindowDimensions();
+  const width = useAppWidth();
   const photo = Math.max(PHOTO, Math.round(height * 0.46));
   const insets = useSafeAreaInsets();
   const top = Platform.OS === 'ios' ? 14 : insets.top + 6; // a page sheet on iPhone, full screen elsewhere

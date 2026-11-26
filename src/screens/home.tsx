@@ -1,6 +1,6 @@
 // Home: the fleet photo, a greeting, the one gold button, the next ride (if there is one) and the shortest ways to book another.
 import { useEffect, useRef } from 'react';
-import { Animated, Easing, Image, Linking, RefreshControl, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Animated, Easing, Image, Linking, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import RideCard from '../components/ride-card';
@@ -12,6 +12,7 @@ import { VEHICLES } from '../lib/estimate';
 import { CAR_PHOTO, FLEET_PHOTO } from '../lib/photos';
 import type { Prefill } from './book';
 import { C, SERIF, TAB_SPACE } from '../theme';
+import { useAppWidth } from '../lib/layout';
 
 type Props = { me: Me; rides: Ride[]; refreshing: boolean; onRefresh: () => void; onBook: (prefill?: Prefill) => void; onOpen: (r: Ride) => void };
 
@@ -31,7 +32,7 @@ const PROMISES: { icon: IconName; text: string }[] = [
 
 export default function HomeScreen({ me, rides, refreshing, onRefresh, onBook, onOpen }: Props) {
   const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
+  const width = useAppWidth();
   const hero = 283 + insets.top;
   const next = rides
     .filter((r) => isUpcoming(r) && r.ride_datetime)

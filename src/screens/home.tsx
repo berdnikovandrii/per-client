@@ -20,7 +20,7 @@ const SAN = AIRPORTS[0].value;
 const LAX = AIRPORTS[1].value;
 const SHORTCUTS: { title: string; line: string; prefill: Prefill }[] = [
   { title: 'To SAN Airport', line: 'Flat rates from $60', prefill: { dropoff: SAN } },
-  { title: 'From SAN Airport', line: 'Flight tracked · meet & greet', prefill: { pickup: SAN } },
+  { title: 'From SAN Airport', line: 'Flight tracked · 60 min free waiting', prefill: { pickup: SAN } },
   { title: 'San Diego ↔ LAX', line: '$375 one way · $700 round trip', prefill: { dropoff: LAX } },
   { title: 'By the hour', line: 'SUV $95/h · Sprinter $180/h', prefill: { tripType: 'Hourly' } },
 ];

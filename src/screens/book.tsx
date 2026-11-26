@@ -19,7 +19,11 @@ import { C, SERIF } from '../theme';
 
 export type Prefill = { pickup?: string; dropoff?: string; tripType?: Booking['trip_type']; stops?: string[]; passengers?: number; vehicle?: VehicleKey; hours?: number };
 
-const EXTRAS = ['Child seat', 'Name sign at arrivals', 'Extra luggage', 'Pet on board'];
+// Meet & greet at baggage claim is a paid extra, $25; the default airport pickup is curbside (Andrii, 2026-11-25).
+// It is offered only when a pickup is at an airport, and its price is part of the price the rider sees.
+const GREET = 'Meet & greet at baggage claim (+$25)';
+const GREET_FEE = 25;
+const EXTRAS = ['Child seat', GREET, 'Extra luggage', 'Pet on board'];
 
 const TRIPS: Booking['trip_type'][] = ['One way', 'Round trip', 'Hourly'];
 const isAirport = isAirportPlace;
@@ -82,6 +86,13 @@ export default function BookScreen({ me, prefill, first, onClose, onBooked }: { 
     if (airportRide && vehicle === 'Sprinter') setVehicle('SUV');
   }, [airportRide, vehicle]);
 
+  const greetOffered = isAirport(pickup) || (tripType === 'Round trip' && isAirport(dropoff));
+  useEffect(() => {
+    if (!greetOffered) setExtras((list) => (list.includes(GREET) ? list.filter((x) => x !== GREET) : list));
+  }, [greetOffered]);
+  const greetFee = extras.includes(GREET) ? GREET_FEE : 0;
+  const total = est?.amount != null ? est.amount + greetFee : null;
+
   function pickVehicle(key: VehicleKey) {
     if (key === 'Sprinter' && airportRide) return;
     setVehicle(key);
@@ -118,14 +129,14 @@ export default function BookScreen({ me, prefill, first, onClose, onBooked }: { 
         passengers,
         flight_number: flight.trim(),
         note: note.trim(),
-        estimate: est?.amount ?? null,
+        estimate: total,
         passenger_name: forOther ? passengerName.trim() : '',
         passenger_phone: forOther ? passengerPhone.trim() : '',
         extras,
         ref: first ? refCode.trim() : '',
       });
       haptic.success();
-      trackBooking(est?.amount ?? null);
+      trackBooking(total);
       setDone(id);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -154,7 +165,7 @@ export default function BookScreen({ me, prefill, first, onClose, onBooked }: { 
         <Rise delay={150} style={{ alignItems: 'center', alignSelf: 'stretch' }}>
           <Text style={styles.doneTitle}>Request sent</Text>
           <Text style={styles.doneText}>
-            We are checking the schedule now and will confirm shortly{est?.amount ? ` at ${money(est.amount)}` : ' with your price'}. You will get a
+            We are checking the schedule now and will confirm shortly{total ? ` at ${money(total)}` : ' with your price'}. You will get a
             notification, and the ride appears under My rides.
           </Text>
           <GoldButton label="See my rides" arrow onPress={() => onBooked(done)} style={{ alignSelf: 'stretch', marginTop: 28 }} />
@@ -271,7 +282,7 @@ export default function BookScreen({ me, prefill, first, onClose, onBooked }: { 
         <View style={{ gap: 8 }}>
           <Text style={T.fieldLabel}>Extras</Text>
           <View style={styles.extras}>
-            {EXTRAS.map((x) => {
+            {EXTRAS.filter((x) => x !== GREET || greetOffered).map((x) => {
               const on = extras.includes(x);
               return (
                 <Tap key={x} style={[styles.extra, on && styles.extraOn]} feedback="select" onPress={() => setExtras((list) => (on ? list.filter((y) => y !== x) : [...list, x]))} accessibilityRole="checkbox" accessibilityState={{ checked: on }} accessibilityLabel={x}>
@@ -304,7 +315,7 @@ export default function BookScreen({ me, prefill, first, onClose, onBooked }: { 
         </View>
 
         <View style={styles.terms}>
-          {est ? <Text style={styles.termsLead}>{est.basis}</Text> : null}
+          {est ? <Text style={styles.termsLead}>{est.basis}{greetFee && est.amount != null ? ` + $${GREET_FEE} meet & greet` : ''}</Text> : null}
           {est?.amount != null ? <Text style={styles.termsText}>{INCLUDED}</Text> : null}
           <Text style={styles.termsText}>No payment now. We confirm the ride first; you pay by Zelle, Venmo or card after that.</Text>
         </View>
@@ -320,7 +331,7 @@ export default function BookScreen({ me, prefill, first, onClose, onBooked }: { 
               {est?.amount != null ? 'Fuel and tolls included' : est ? 'We confirm the price, usually within 15 minutes' : 'Add pickup and drop-off to see it'}
             </Text>
           </View>
-          {est?.amount != null ? <Text style={styles.barPrice}>{money(est.amount)}</Text> : null}
+          {total != null ? <Text style={styles.barPrice}>{money(total)}</Text> : null}
         </View>
         {!!error && <Text style={styles.error} accessibilityLiveRegion="polite">{error}</Text>}
         {typing ? null : <GoldButton label="Request this ride" onPress={send} busy={busy} />}

@@ -57,6 +57,8 @@ export default function RideScreen({ ride, onClose, onChanged, onBookAgain }: Pr
   const team = (ride.vehicles || []).filter((v) => v && (v.chauffeur || v.car));
   const live = ride.status !== 'cancelled' && ride.status !== 'completed';
   const airportPickup = isAirportText(ride.pickup);
+  // the paid meet & greet at baggage claim (or the older free name sign) changes where the chauffeur meets the rider
+  const greet = (ride.extras || []).some((x) => /meet\s*&\s*greet|name sign/i.test(x));
   const rc = receipt(ride);
   const moving = ride.status === 'on_the_way' || ride.status === 'on_board';
   const car = moving ? ride.location : null;
@@ -381,11 +383,18 @@ export default function RideScreen({ ride, onClose, onChanged, onBookAgain }: Pr
         {live && airportPickup && (
           <Card style={{ gap: 14 }}>
             <Label>Where we meet</Label>
-            {[
-              "After you land, switch your phone on. Your chauffeur's name and number are on this screen.",
-              'Collect your bags. There is no rush: 60 minutes of waiting are free, 90 on international flights.',
-              'Text or call your chauffeur when you have your bags. He tells you the exact pickup spot at your terminal and is there in a few minutes.',
-            ].map((line, i) => (
+            {(greet
+              ? [
+                  "After you land, switch your phone on. Your chauffeur's name and number are on this screen.",
+                  'Your chauffeur waits for you at baggage claim with a sign with your name.',
+                  'There is no rush: 60 minutes of waiting are free, 90 on international flights.',
+                ]
+              : [
+                  "After you land, switch your phone on. Your chauffeur's name and number are on this screen.",
+                  'Collect your bags. There is no rush: 60 minutes of waiting are free, 90 on international flights.',
+                  'Text or call your chauffeur when you have your bags. He tells you the exact pickup spot at your terminal and is there in a few minutes.',
+                ]
+            ).map((line, i) => (
               <View key={i} style={{ flexDirection: 'row', gap: 12 }}>
                 <View style={styles.num}>
                   <Text style={styles.numText}>{i + 1}</Text>

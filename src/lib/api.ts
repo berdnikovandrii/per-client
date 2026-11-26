@@ -80,6 +80,8 @@ export type Ride = {
   location: { lat: number; lng: number; heading: number | null; at: string } | null;
   /** when the car gets there, with live traffic: to the pickup while on the way, to the drop-off once on board */
   eta?: { at: string; to: 'pickup' | 'dropoff' } | null;
+  /** What the rider ticked when booking: child seat, meet & greet… */
+  extras?: string[] | null;
   booked_in_app: boolean;
   created_at: string;
 };
